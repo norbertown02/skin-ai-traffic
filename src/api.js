@@ -9,6 +9,7 @@ export const endpoints = {
   shopify: `${SUPABASE_URL}/functions/v1/traffic-shopify-secure-api`,
   funnel: `${SUPABASE_URL}/functions/v1/traffic-funnel-insights-api`,
   audience: `${SUPABASE_URL}/functions/v1/traffic-audience-insights-api`,
+  deep: `${SUPABASE_URL}/functions/v1/traffic-deep-analysis-api?days=30`,
   video: `${SUPABASE_URL}/functions/v1/traffic-video-insights-api`,
 }
 
@@ -41,18 +42,22 @@ export async function api(url, init = {}) {
   return data
 }
 
-async function optional(url) {
-  try { return await api(url) } catch { return null }
+async function optional(url, fallback = null) {
+  try { return await api(url) } catch (error) { console.warn('optional endpoint failed', url, error); return fallback }
 }
 
 export async function loadCoreData() {
-  const [bootstrap, shopify, funnel, manager, audience, video] = await Promise.all([
+  const [bootstrap, shopify, funnel, manager, audience, deep] = await Promise.all([
     api(endpoints.bootstrap),
     api(endpoints.shopify),
     api(endpoints.funnel),
     api(endpoints.manager),
-    optional(endpoints.audience),
-    optional(endpoints.video),
+    optional(endpoints.audience, { by_age: [], by_gender: [], age_gender: [] }),
+    optional(endpoints.deep, { creative_profiles: [], cross: {}, waste: { summary: {}, items: [] }, benchmarks: {} }),
   ])
-  return { bootstrap, shopify, funnel, manager, audience, video }
+  return { bootstrap, shopify, funnel, manager, audience, deep }
+}
+
+export async function loadVideoInsight(creativeId) {
+  return api(`${endpoints.video}?creative_id=${encodeURIComponent(creativeId)}`)
 }
