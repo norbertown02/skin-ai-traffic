@@ -14,21 +14,11 @@ export const endpoints = {
 export function getSession() {
   try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null') } catch { return null }
 }
-
-export function setSession(session) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session))
-}
-
-export function clearSession() {
-  localStorage.removeItem(SESSION_KEY)
-}
+export function setSession(session) { localStorage.setItem(SESSION_KEY, JSON.stringify(session)) }
+export function clearSession() { localStorage.removeItem(SESSION_KEY) }
 
 export async function login(username, password) {
-  const response = await fetch(endpoints.login, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
-  })
+  const response = await fetch(endpoints.login, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) })
   const data = await response.json()
   if (!response.ok || !data?.ok) throw new Error(data?.error || 'login_failed')
   const session = { token: data.token, expires_at: data.expires_at, user: data.user }
@@ -39,15 +29,7 @@ export async function login(username, password) {
 export async function api(url, init = {}) {
   const session = getSession()
   if (!session?.token) throw new Error('no-session')
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${session.token}`,
-      'Content-Type': 'application/json',
-      ...(init.headers || {}),
-    },
-    cache: 'no-store',
-  })
+  const response = await fetch(url, { ...init, headers: { Authorization: `Bearer ${session.token}`, 'Content-Type': 'application/json', ...(init.headers || {}) }, cache: 'no-store' })
   const text = await response.text()
   let data = null
   try { data = text ? JSON.parse(text) : null } catch { data = text }
@@ -55,12 +37,13 @@ export async function api(url, init = {}) {
   return data
 }
 
+async function optional(url) {
+  try { return await api(url) } catch { return null }
+}
+
 export async function loadCoreData() {
-  const [bootstrap, shopify, funnel, manager] = await Promise.all([
-    api(endpoints.bootstrap),
-    api(endpoints.shopify),
-    api(endpoints.funnel),
-    api(endpoints.manager),
+  const [bootstrap, shopify, funnel, manager, audience, video] = await Promise.all([
+    api(endpoints.bootstrap), api(endpoints.shopify), api(endpoints.funnel), api(endpoints.manager), optional(endpoints.audience), optional(endpoints.video),
   ])
-  return { bootstrap, shopify, funnel, manager }
+  return { bootstrap, shopify, funnel, manager, audience, video }
 }
