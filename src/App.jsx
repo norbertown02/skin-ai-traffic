@@ -3,7 +3,8 @@ import Login from './components/Login.jsx'
 import Shell from './components/Shell.jsx'
 import DiagnosticModal from './components/DiagnosticModal.jsx'
 import ApprovalsPage from './pages/ApprovalsPage.jsx'
-import { AnalysisPro, AudiencesPro, CreativesPro, EntityPro, ExecutivePro, IntegrationsPro, ManagerPro, PlacementsPro, WastePro } from './pages/ProPages.jsx'
+import ExecutiveClean from './pages/ExecutiveClean.jsx'
+import { AnalysisPro, AudiencesPro, CreativesPro, EntityPro, IntegrationsPro, ManagerPro, PlacementsPro, WastePro } from './pages/ProPages.jsx'
 import { clearSession, getSession, loadCoreData } from './api.js'
 
 export default function App() {
@@ -27,7 +28,7 @@ export default function App() {
 
   const page = {
     manager: <ManagerPro data={data} onOpen={setDiagnosticId} onRefresh={refresh} />,
-    executive: <ExecutivePro data={data} />,
+    executive: <ExecutiveClean data={data} />,
     approvals: <ApprovalsPage data={data} onOpen={setDiagnosticId} onRefresh={refresh} />,
     analysis: <AnalysisPro data={data} />,
     creatives: <CreativesPro data={data} />,
