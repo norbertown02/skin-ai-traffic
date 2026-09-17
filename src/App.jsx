@@ -6,7 +6,9 @@ import ApprovalsPage from './pages/ApprovalsPage.jsx'
 import ExecutiveClean from './pages/ExecutiveClean.jsx'
 import CreativesClean from './pages/CreativesClean.jsx'
 import IntegrationsClean from './pages/IntegrationsClean.jsx'
-import { AnalysisPro, AudiencesPro, EntityPro, ManagerPro, PlacementsPro, WastePro } from './pages/ProPages.jsx'
+import ManagerDeep from './pages/ManagerDeep.jsx'
+import AnalysisDeep from './pages/AnalysisDeep.jsx'
+import { AudiencesPro, EntityPro, PlacementsPro, WastePro } from './pages/ProPages.jsx'
 import { api, clearSession, endpoints, getSession, loadCoreData } from './api.js'
 
 const validTabs = new Set(['manager','executive','approvals','analysis','creatives','audiences','placements','campaigns','sets','ads','waste','integrations'])
@@ -74,9 +76,9 @@ export default function App() {
   }
 
   const page = {
-    manager: <ManagerPro data={data} onOpen={setDiagnosticId} onRefresh={runManager} />,
+    manager: <ManagerDeep data={data} onOpen={setDiagnosticId} onRefresh={runManager} />,
     approvals: <ApprovalsPage data={data} onOpen={setDiagnosticId} onRefresh={refresh} />,
-    analysis: <AnalysisPro data={data} />,
+    analysis: <AnalysisDeep data={data} />,
     creatives: <CreativesClean data={data} />,
     audiences: <AudiencesPro data={data} />,
     placements: <PlacementsPro data={data} />,
