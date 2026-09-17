@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { ChartCard, HorizontalBars } from '../components/Charts.jsx'
 import { DataTable, PageHeader, SectionHeader, Surface } from '../components/UI.jsx'
-import { integer, money, num, pct } from '../lib/format.js'
+import { cleanAdName, integer, money, num, pct } from '../lib/format.js'
 
 const n=v=>Number(v||0)
 const sort=(rows,key='spend')=>(rows||[]).slice().sort((a,b)=>n(b[key])-n(a[key]))
@@ -16,6 +16,7 @@ export default function AnalysisDeep({data}){
   const bestAge=sort((audience.by_age||[]).filter(x=>n(x.spend)>0),'roas')[0]
   const bestGender=sort((audience.by_gender||[]).filter(x=>n(x.spend)>0),'roas')[0]
   const tabs=[['overview','Visão geral'],['audience','Público × criativo'],['placement','Placement × criativo'],['waste','Desperdícios']]
+  const creativeName=v=>cleanAdName(v,'Criativo')
 
   return <div className="page deep-page analysis-deep">
     <PageHeader eyebrow="ANÁLISE DETALHADA" title="Central de investigação" description="Aprofunda o que o relatório executivo apontou: leilão, atenção, qualidade do clique, público, placement, criativo e fundo de funil."/>
@@ -32,21 +33,21 @@ export default function AnalysisDeep({data}){
 
     {tab==='audience'&&<>
       <SectionHeader number="01" eyebrow="PÚBLICO × CRIATIVO" title="A peça certa para a audiência certa" description="O mesmo criativo pode ser vencedor em um público e fraco em outro. Aqui a análise sai do agregado."/>
-      <div className="deep-two"><HorizontalBars title="Maior gasto por combinação" rows={topAudience.map((x,i)=>({key:`${x.creative_name||'Criativo'} · ${x.audience_type||x.ad_set_name||'Público'}`,spend:x.spend}))} valueKey="spend" formatValue={money}/><HorizontalBars title="Maior ROAS por combinação" rows={sort(crossAudience.filter(x=>n(x.spend)>=20),'roas').slice(0,10).map(x=>({key:`${x.creative_name||'Criativo'} · ${x.audience_type||x.ad_set_name||'Público'}`,roas:x.roas}))} valueKey="roas" formatValue={num}/></div>
-      <Surface eyebrow="DETALHE" title="Todas as combinações relevantes"><DataTable rows={sort(crossAudience,'spend').slice(0,80)} columns={[{key:'creative_name',label:'Criativo'},{key:'ad_set_name',label:'Conjunto'},{key:'audience_type',label:'Público'},{key:'spend',label:'Gasto',render:r=>money(r.spend)},{key:'ctr',label:'CTR',render:r=>pct(r.ctr)},{key:'purchases',label:'Compras',render:r=>integer(r.purchases)},{key:'cac',label:'CAC',render:r=>money(r.cac)},{key:'roas',label:'ROAS',render:r=>num(r.roas)}]}/></Surface>
+      <div className="deep-two"><HorizontalBars title="Maior gasto por combinação" rows={topAudience.map((x,i)=>({key:`${creativeName(x.creative_name)} · ${x.audience_type||x.ad_set_name||'Público'}`,spend:x.spend}))} valueKey="spend" formatValue={money}/><HorizontalBars title="Maior ROAS por combinação" rows={sort(crossAudience.filter(x=>n(x.spend)>=20),'roas').slice(0,10).map(x=>({key:`${creativeName(x.creative_name)} · ${x.audience_type||x.ad_set_name||'Público'}`,roas:x.roas}))} valueKey="roas" formatValue={num}/></div>
+      <Surface eyebrow="DETALHE" title="Todas as combinações relevantes"><DataTable rows={sort(crossAudience,'spend').slice(0,80)} columns={[{key:'creative_name',label:'Criativo',render:r=>creativeName(r.creative_name)},{key:'ad_set_name',label:'Conjunto'},{key:'audience_type',label:'Público'},{key:'spend',label:'Gasto',render:r=>money(r.spend)},{key:'ctr',label:'CTR',render:r=>pct(r.ctr)},{key:'purchases',label:'Compras',render:r=>integer(r.purchases)},{key:'cac',label:'CAC',render:r=>money(r.cac)},{key:'roas',label:'ROAS',render:r=>num(r.roas)}]}/></Surface>
     </>}
 
     {tab==='placement'&&<>
       <SectionHeader number="01" eyebrow="PLACEMENT × CRIATIVO" title="Onde cada peça funciona melhor" description="Feed, Stories, Reels, Explore e plataforma vistos pelo conjunto peça + contexto, não apenas pela média."/>
-      <div className="deep-two"><HorizontalBars title="Maior gasto por combinação" rows={topPlacement.map(x=>({key:`${x.creative_name||'Criativo'} · ${x.publisher_platform||''} ${x.platform_position||''}`,spend:x.spend}))} valueKey="spend" formatValue={money}/><HorizontalBars title="Maior ROAS por combinação" rows={sort(crossPlacement.filter(x=>n(x.spend)>=20),'roas').slice(0,10).map(x=>({key:`${x.creative_name||'Criativo'} · ${x.publisher_platform||''} ${x.platform_position||''}`,roas:x.roas}))} valueKey="roas" formatValue={num}/></div>
-      <Surface eyebrow="DETALHE" title="Combinações de entrega"><DataTable rows={sort(crossPlacement,'spend').slice(0,80)} columns={[{key:'creative_name',label:'Criativo'},{key:'publisher_platform',label:'Plataforma'},{key:'platform_position',label:'Posição'},{key:'spend',label:'Gasto',render:r=>money(r.spend)},{key:'ctr',label:'CTR',render:r=>pct(r.ctr)},{key:'purchases',label:'Compras',render:r=>integer(r.purchases)},{key:'cac',label:'CAC',render:r=>money(r.cac)},{key:'roas',label:'ROAS',render:r=>num(r.roas)}]}/></Surface>
+      <div className="deep-two"><HorizontalBars title="Maior gasto por combinação" rows={topPlacement.map(x=>({key:`${creativeName(x.creative_name)} · ${x.publisher_platform||''} ${x.platform_position||''}`,spend:x.spend}))} valueKey="spend" formatValue={money}/><HorizontalBars title="Maior ROAS por combinação" rows={sort(crossPlacement.filter(x=>n(x.spend)>=20),'roas').slice(0,10).map(x=>({key:`${creativeName(x.creative_name)} · ${x.publisher_platform||''} ${x.platform_position||''}`,roas:x.roas}))} valueKey="roas" formatValue={num}/></div>
+      <Surface eyebrow="DETALHE" title="Combinações de entrega"><DataTable rows={sort(crossPlacement,'spend').slice(0,80)} columns={[{key:'creative_name',label:'Criativo',render:r=>creativeName(r.creative_name)},{key:'publisher_platform',label:'Plataforma'},{key:'platform_position',label:'Posição'},{key:'spend',label:'Gasto',render:r=>money(r.spend)},{key:'ctr',label:'CTR',render:r=>pct(r.ctr)},{key:'purchases',label:'Compras',render:r=>integer(r.purchases)},{key:'cac',label:'CAC',render:r=>money(r.cac)},{key:'roas',label:'ROAS',render:r=>num(r.roas)}]}/></Surface>
     </>}
 
     {tab==='waste'&&<>
       <div className="deep-metric-grid five"><Metric label="Exposição investigável" value={money(waste?.summary?.estimated_total)}/><Metric label="Público × criativo" value={integer(waste?.summary?.counts?.audience_mismatch)}/><Metric label="Placement × criativo" value={integer(waste?.summary?.counts?.placement_mismatch)}/><Metric label="Atenção" value={integer(waste?.summary?.counts?.attention)}/><Metric label="Pós-clique" value={integer(waste?.summary?.counts?.post_click)}/></div>
       <SectionHeader number="01" eyebrow="DESPERDÍCIOS" title="Onde investigar perda de eficiência" description="A exposição é uma triagem. O próximo passo deve considerar amostra, estágio do funil e contexto do criativo."/>
-      <div className="deep-two"><HorizontalBars title="Maiores exposições" rows={(waste.items||[]).map((x,i)=>({key:x.creative_name||x.ad_name||x.type||`Item ${i+1}`,estimated_waste:x.estimated_waste}))} valueKey="estimated_waste" formatValue={money}/><Surface eyebrow="LEITURA" title="Como interpretar"><div className="deep-checks"><p>✓ Atenção baixa sugere investigar hook, thumb, headline ou encaixe com o público.</p><p>✓ Pós-clique ruim pede investigação de landing, oferta, preço, checkout ou tracking.</p><p>✓ Público/placement deve ser avaliado junto do criativo antes de cortar.</p></div></Surface></div>
-      <Surface eyebrow="DETALHE" title="Sinais classificados"><DataTable rows={waste.items||[]} columns={[{key:'type',label:'Tipo'},{key:'creative_name',label:'Criativo'},{key:'ad_name',label:'Anúncio'},{key:'estimated_waste',label:'Exposição',render:r=>money(r.estimated_waste)},{key:'reason',label:'Diagnóstico'},{key:'action',label:'Próximo passo'}]}/></Surface>
+      <div className="deep-two"><HorizontalBars title="Maiores exposições" rows={(waste.items||[]).map((x,i)=>({key:x.creative_name?creativeName(x.creative_name):x.ad_name?cleanAdName(x.ad_name):x.type||`Item ${i+1}`,estimated_waste:x.estimated_waste}))} valueKey="estimated_waste" formatValue={money}/><Surface eyebrow="LEITURA" title="Como interpretar"><div className="deep-checks"><p>✓ Atenção baixa sugere investigar hook, thumb, headline ou encaixe com o público.</p><p>✓ Pós-clique ruim pede investigação de landing, oferta, preço, checkout ou tracking.</p><p>✓ Público/placement deve ser avaliado junto do criativo antes de cortar.</p></div></Surface></div>
+      <Surface eyebrow="DETALHE" title="Sinais classificados"><DataTable rows={waste.items||[]} columns={[{key:'type',label:'Tipo'},{key:'creative_name',label:'Criativo',render:r=>cleanAdName(r.creative_name,'—')},{key:'ad_name',label:'Anúncio',render:r=>cleanAdName(r.ad_name,'—')},{key:'estimated_waste',label:'Exposição',render:r=>money(r.estimated_waste)},{key:'reason',label:'Diagnóstico'},{key:'action',label:'Próximo passo'}]}/></Surface>
     </>}
   </div>
 }
