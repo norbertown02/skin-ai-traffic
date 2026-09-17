@@ -28,3 +28,28 @@ export const priorityRank = (value) => ({ critical: 4, high: 3, medium: 2, low: 
 export const priorityLabel = (value) => ({ critical: 'Crítica', high: 'Alta', medium: 'Média', low: 'Baixa', info: 'Informativa' }[String(value || '').toLowerCase()] || 'Média')
 export const statusLabel = (value) => ({ open: 'Pendente', approved: 'Aprovada', rejected: 'Rejeitada', expired: 'Expirada', running: 'Em teste', validating: 'Validando', proposed: 'Proposto' }[String(value || '').toLowerCase()] || String(value || '—'))
 export const sourceDate = (data) => data?.bootstrap?.main?.daily?.at?.(-1)?.date || data?.bootstrap?.main?.period?.end || null
+
+export const cleanAdName = (value, fallback = 'Anúncio') => {
+  let s = String(value || '').trim()
+  if (!s) return fallback
+  s = s
+    .replace(/\b(?:ad[\s_-]*id|an[uú]ncio[\s_-]*id|id)\s*[:#=-]?\s*\d{8,}\b/gi, '')
+    .replace(/\b\d{10,}\b/g, '')
+    .replace(/[([]\s*\d{10,}\s*[)\]]/g, '')
+    .replace(/\s*[-–—|:/]+\s*$/g, '')
+    .replace(/^\s*[-–—|:/]+\s*/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+  return s || fallback
+}
+
+export const cleanAdText = (value) => {
+  if (value === null || value === undefined) return '—'
+  if (typeof value !== 'string') return value
+  return value
+    .replace(/\b(?:ad[\s_-]*id|an[uú]ncio[\s_-]*id|id)\s*[:#=-]?\s*\d{8,}\b/gi, '')
+    .replace(/\b\d{10,}\b/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.;:])/g, '$1')
+    .trim()
+}
