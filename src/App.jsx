@@ -6,6 +6,7 @@ import ApprovalsPage from './pages/ApprovalsPage.jsx'
 import ExecutiveClean from './pages/ExecutiveClean.jsx'
 import CreativesClean from './pages/CreativesClean.jsx'
 import IntegrationsClean from './pages/IntegrationsClean.jsx'
+import StrategyPage from './pages/StrategyPage.jsx'
 import ManagerDeep from './pages/ManagerDeep.jsx'
 import AnalysisDeep from './pages/AnalysisDeep.jsx'
 import AudienceDeep from './pages/AudienceDeep.jsx'
@@ -14,10 +15,10 @@ import EntityDeep from './pages/EntityDeep.jsx'
 import WasteDeep from './pages/WasteDeep.jsx'
 import { api, clearSession, endpoints, getSession, loadCoreData } from './api.js'
 
-const validTabs = new Set(['manager','executive','approvals','analysis','creatives','audiences','placements','campaigns','sets','ads','waste','integrations'])
+const validTabs = new Set(['strategy','manager','executive','approvals','analysis','creatives','audiences','placements','campaigns','sets','ads','waste','integrations'])
 const hashTab = () => {
   const key = String(window.location.hash || '').replace(/^#\/?/, '')
-  return validTabs.has(key) ? key : 'manager'
+  return validTabs.has(key) ? key : 'strategy'
 }
 
 export default function App() {
@@ -48,7 +49,7 @@ export default function App() {
       await api(endpoints.manager, { method: 'POST', body: JSON.stringify({ action: 'run' }) })
       setData(await loadCoreData())
     } catch (e) {
-      const message = e.message || 'Não foi possível atualizar a leitura do Gestor IA.'
+      const message = e.message || 'Não foi possível atualizar a leitura do Gestor.'
       if (/unauthorized|no-session|forbidden/i.test(message)) expireSession('Sua sessão expirou. Entre novamente.')
       else setError(message)
     } finally { setLoading(false) }
@@ -79,6 +80,7 @@ export default function App() {
   }
 
   const page = {
+    strategy: <StrategyPage data={data} onGoManager={() => navigate('manager')} />,
     manager: <ManagerDeep data={data} onOpen={setDiagnosticId} onRefresh={runManager} />,
     approvals: <ApprovalsPage data={data} onOpen={setDiagnosticId} onRefresh={refresh} />,
     analysis: <AnalysisDeep data={data} />,
