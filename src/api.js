@@ -47,16 +47,15 @@ async function optional(url, fallback = null) {
 }
 
 export async function loadCoreData() {
-  const [bootstrap, shopify, funnel, manager, audience, deep, video] = await Promise.all([
+  const [bootstrap, shopify, funnel, manager, audience, deep] = await Promise.all([
     api(endpoints.bootstrap),
     api(endpoints.shopify),
     api(endpoints.funnel),
     api(endpoints.manager),
     optional(endpoints.audience, { by_age: [], by_gender: [], age_gender: [] }),
     optional(endpoints.deep, { creative_profiles: [], cross: {}, waste: { summary: {}, items: [] }, benchmarks: {} }),
-    optional(endpoints.video, { items: [] }),
   ])
-  return { bootstrap, shopify, funnel, manager, audience, deep, video }
+  return { bootstrap, shopify, funnel, manager, audience, deep }
 }
 
 export async function loadVideoInsight(creativeId) {
