@@ -2,125 +2,142 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Chart from 'chart.js/auto'
 import { api, clearSession, endpoints, getSession, loadCoreData, login } from './api.js'
 
-const money = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2 }).format(Number(v || 0))
-const num = (v, d = 2) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: d })
-const integer = (v) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })
-const pct = (v) => `${num(v, 1)}%`
-const monthLabel = (s) => s ? new Date(`${s}T12:00:00`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : '—'
+const money = v => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:2}).format(Number(v||0))
+const num = (v,d=2)=>Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:d})
+const integer = v=>Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:0})
+const pct = v=>`${num(v,1)}%`
+const monthLabel = s=>s?new Date(`${s}T12:00:00`).toLocaleDateString('pt-BR',{month:'long',year:'numeric'}):'—'
+const shortMonth = s=>s?new Date(`${s}T12:00:00`).toLocaleDateString('pt-BR',{month:'short'}):'—'
+const delta=(a,b)=>{a=Number(a||0);b=Number(b||0);if(!b)return null;return(a-b)/b*100}
+const deltaText=(a,b)=>{const d=delta(a,b);return d==null?'Sem base':`${d>=0?'+':''}${num(d,1)}% vs anterior`}
+const tone=d=>d==null?'neutral':d>1?'good':d<-1?'bad':'neutral'
+const fmtDate=v=>{try{return new Date(v).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}catch{return'—'}}
 
-function ChartBox({ title, labels, data, format = 'number' }) {
-  const ref = useRef(null)
-  useEffect(() => {
-    if (!ref.current) return
-    const chart = new Chart(ref.current, {
-      type: 'line',
-      data: { labels, datasets: [{ label: title, data, borderWidth: 2, tension: .35, pointRadius: 3 }] },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { x: { grid: { display: false } }, y: { grid: { color: '#eee7ec' }, ticks: { callback: (v) => format === 'money' ? `R$ ${v}` : format === 'pct' ? `${v}%` : v } } },
-      },
-    })
-    return () => chart.destroy()
-  }, [title, JSON.stringify(labels), JSON.stringify(data), format])
-  return <section className="panel"><div className="panel-head"><h3>{title}</h3></div><div className="chart"><canvas ref={ref} /></div></section>
-}
-
-function Login({ onSuccess }) {
-  const [username, setUsername] = useState('user')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  async function submit(e) {
-    e.preventDefault(); setLoading(true); setError('')
-    try { await login(username, password); onSuccess() } catch { setError('Usuário ou senha inválidos.') } finally { setLoading(false) }
-  }
-  return <div className="login-layout">
-    <section className="login-hero"><div className="brand">SKIN BEAUTY</div><h1>Dados que mostram onde crescer.</h1><p>Meta Ads e Shopify em uma visão executiva clara, visual e profunda.</p></section>
-    <form className="login-card" onSubmit={submit}><div className="brand small">AI TRAFFIC MANAGER</div><h2>Bem-vindo de volta</h2><label>Usuário<input value={username} onChange={e => setUsername(e.target.value)} /></label><label>Senha<input type="password" value={password} onChange={e => setPassword(e.target.value)} /></label><button disabled={loading}>{loading ? 'Entrando…' : 'Entrar'}</button>{error && <p className="error">{error}</p>}</form>
-  </div>
-}
-
-const nav = [
-  ['manager', 'Gestor IA'], ['executive', 'Relatório Gerencial'], ['approvals', 'Aprovações'],
-  ['analysis', 'Análise Detalhada'], ['creatives', 'Criativos'], ['audiences', 'Públicos'], ['placements', 'Placements'],
-  ['campaigns', 'Campanhas'], ['sets', 'Conjuntos'], ['ads', 'Anúncios'], ['waste', 'Desperdícios'], ['integrations', 'Integrações'],
+const navGroups=[
+  {label:'Gestão',items:[['manager','Gestor IA'],['executive','Relatório Gerencial'],['approvals','Aprovações']]},
+  {label:'Análise',items:[['analysis','Análise Detalhada'],['creatives','Criativos'],['audiences','Públicos'],['placements','Placements']]},
+  {label:'Mídia',items:[['campaigns','Campanhas'],['sets','Conjuntos'],['ads','Anúncios'],['waste','Desperdícios']]},
+  {label:'Sistema',items:[['integrations','Integrações']]},
 ]
 
-function Kpi({ label, value, note }) { return <div className="kpi"><small>{label}</small><b>{value}</b>{note && <span>{note}</span>}</div> }
-
-function Funnel({ rows }) {
-  const max = Math.max(1, Number(rows?.[0]?.value || 0))
-  return <div className="funnel">{rows.map((r, i) => {
-    const prev = i ? Number(rows[i - 1].value || 0) : max
-    const step = i ? Number(r.value || 0) / Math.max(1, prev) * 100 : 100
-    const total = Number(r.value || 0) / max * 100
-    return <div className="funnel-row" key={r.label}><span>{r.label}</span><div className="track"><div className="fill" style={{ width: `${Math.max(2, total)}%` }} /></div><b>{integer(r.value)}</b><em>{pct(step)}</em></div>
-  })}</div>
+function ChartBox({title,subtitle,labels,datasets,height=280}){
+  const ref=useRef(null)
+  useEffect(()=>{
+    if(!ref.current)return
+    const chart=new Chart(ref.current,{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:datasets.length>1,labels:{usePointStyle:true,boxWidth:8,font:{size:12}}},tooltip:{padding:12}},scales:{x:{grid:{display:false},ticks:{font:{size:11},color:'#8a7c87'}},y:{grid:{color:'#efe8ed'},ticks:{font:{size:11},color:'#8a7c87'}}}}})
+    return()=>chart.destroy()
+  },[JSON.stringify(labels),JSON.stringify(datasets)])
+  return <section className="surface chart-card"><div className="card-heading"><div><span className="overline">EVOLUÇÃO</span><h3>{title}</h3>{subtitle&&<p>{subtitle}</p>}</div></div><div className="chart" style={{height}}><canvas ref={ref}/></div></section>
 }
 
-function Executive({ data }) {
-  const business = data?.shopify?.business || []
-  const funnelMonths = data?.funnel?.months || []
-  const [selected, setSelected] = useState(business.at(-1)?.month_start || '')
-  const current = business.find(x => x.month_start === selected) || business.at(-1)
-  const idx = business.findIndex(x => x.month_start === current?.month_start)
-  const previous = idx > 0 ? business[idx - 1] : null
-  const fm = funnelMonths.find(x => x.month_start === current?.month_start)
-  if (!current) return <Empty text="Sem dados gerenciais." />
-  const labels = business.map(x => new Date(`${x.month_start}T12:00:00`).toLocaleDateString('pt-BR', { month: 'short' }))
-  return <div className="page">
-    <div className="page-title-row"><div><div className="eyebrow">RELATÓRIO GERENCIAL</div><h1>Performance mês a mês</h1><p>Meta Ads + Shopify em uma leitura única.</p></div><select value={current.month_start} onChange={e => setSelected(e.target.value)}>{business.slice().reverse().map(x => <option key={x.month_start} value={x.month_start}>{monthLabel(x.month_start)}</option>)}</select></div>
-    <div className="kpi-grid"><Kpi label="Investimento" value={money(current.meta_spend)} /><Kpi label="Receita Shopify" value={money(current.shopify_revenue)} /><Kpi label="Pedidos" value={integer(current.shopify_orders)} /><Kpi label="MER" value={num(current.mer)} /><Kpi label="ROAS Meta" value={num(current.meta_roas)} /><Kpi label="Conversão" value={pct(Number(current.conversion_rate || 0) * 100)} /></div>
-    <SectionTitle n="01" title="Do clique à compra" text="Funil Meta e funil real da Shopify lado a lado." />
-    <div className="grid2"><section className="panel"><h3>Funil Meta</h3><Funnel rows={[['Cliques no link', fm?.link_clicks], ['Visualizações da página', fm?.landing_page_views], ['Carrinhos', fm?.adds_to_cart], ['Checkout', fm?.initiates_checkout], ['Compras', fm?.purchases]].map(([label, value]) => ({ label, value }))} /></section><section className="panel"><h3>Funil Shopify real</h3><Funnel rows={[['Sessões', current.sessions], ['Carrinhos', current.cart_additions], ['Checkout', current.reached_checkout], ['Compras', current.completed_checkout || current.shopify_orders]].map(([label, value]) => ({ label, value }))} /></section></div>
-    <SectionTitle n="02" title="Eficiência de entrega" text="Valor atual e comportamento de CPM, CPC, CTR e frequência." />
-    <div className="kpi-grid four"><Kpi label="CPM" value={money(fm?.cpm)} /><Kpi label="CPC" value={money(fm?.cpc)} /><Kpi label="CTR" value={pct(fm?.ctr)} /><Kpi label="Frequência" value={num(fm?.frequency)} /></div>
-    <div className="grid2"><ChartBox title="CPM" labels={labels} data={business.map(x => funnelMonths.find(f => f.month_start === x.month_start)?.cpm || 0)} format="money" /><ChartBox title="CPC" labels={labels} data={business.map(x => funnelMonths.find(f => f.month_start === x.month_start)?.cpc || 0)} format="money" /><ChartBox title="CTR" labels={labels} data={business.map(x => funnelMonths.find(f => f.month_start === x.month_start)?.ctr || 0)} format="pct" /><ChartBox title="Frequência" labels={labels} data={business.map(x => funnelMonths.find(f => f.month_start === x.month_start)?.frequency || 0)} /></div>
-    <SectionTitle n="03" title="Evolução" text="Investimento, receita e eficiência ao longo dos meses." />
-    <div className="grid2"><ChartBox title="Receita Shopify" labels={labels} data={business.map(x => Number(x.shopify_revenue || 0))} format="money" /><ChartBox title="Investimento Meta" labels={labels} data={business.map(x => Number(x.meta_spend || 0))} format="money" /></div>
-    {previous && <div className="note">Comparativo selecionado: {monthLabel(previous.month_start)} → {monthLabel(current.month_start)}</div>}
+function Kpi({label,value,note,deltaValue,positive=true,accent=false}){
+  const cls=deltaValue==null?'neutral':(positive?(deltaValue>=0?'good':'bad'):(deltaValue<=0?'good':'bad'))
+  return <div className={`metric-card ${accent?'accent':''}`}><div className="metric-top"><span>{label}</span>{deltaValue!=null&&<i className={cls}>{deltaValue>=0?'↗':'↘'}</i>}</div><strong>{value}</strong><small className={cls}>{note}</small></div>
+}
+
+function SectionTitle({index,eyebrow,title,text,aside}){
+  return <div className="section-title"><div className="section-number">{index}</div><div className="section-copy"><span className="overline">{eyebrow}</span><h2>{title}</h2><p>{text}</p></div>{aside&&<div className="section-aside">{aside}</div>}</div>
+}
+
+function Funnel({rows}){
+  const max=Math.max(1,Number(rows?.[0]?.value||0))
+  return <div className="funnel">{rows.map((r,i)=>{const v=Number(r.value||0);const prev=i?Number(rows[i-1].value||0):max;const step=i?v/Math.max(1,prev)*100:100;const total=v/max*100;return <div className="funnel-row" key={r.label}><div className="funnel-label"><span>{r.label}</span><small>{i===0?'Entrada do funil':`${pct(step)} da etapa anterior`}</small></div><div className="funnel-bar"><div style={{width:`${Math.max(3,total)}%`}}/></div><strong>{integer(v)}</strong><em>{pct(total)}</em></div>})}</div>
+}
+
+function Login({onSuccess}){
+  const [username,setUsername]=useState('user'),[password,setPassword]=useState(''),[loading,setLoading]=useState(false),[error,setError]=useState('')
+  async function submit(e){e.preventDefault();setLoading(true);setError('');try{await login(username,password);onSuccess()}catch{setError('Usuário ou senha inválidos.')}finally{setLoading(false)}}
+  return <div className="login-shell"><section className="login-visual"><div className="login-brand">SKIN BEAUTY</div><div className="login-copy"><span className="overline light">AI TRAFFIC MANAGER</span><h1>Dados que viram<br/>decisões melhores.</h1><p>Meta Ads e Shopify conectados em uma leitura executiva, visual e profunda da operação.</p></div><div className="login-points"><div><b>01</b><span>Relatório executivo</span></div><div><b>02</b><span>Diagnóstico com IA</span></div><div><b>03</b><span>Decisões e aprovação</span></div></div></section><form className="login-panel" onSubmit={submit}><div className="login-mini">SKIN BEAUTY · AI TRAFFIC MANAGER</div><h2>Bem-vindo de volta</h2><p>Acesse o painel de gestão de tráfego.</p><label>Usuário<input value={username} onChange={e=>setUsername(e.target.value)} autoComplete="username"/></label><label>Senha<input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password"/></label><button disabled={loading}>{loading?'Entrando…':'Entrar no painel'}</button>{error&&<div className="form-error">{error}</div>}</form></div>
+}
+
+function Executive({data}){
+  const business=data?.shopify?.business||[]
+  const funnelMonths=data?.funnel?.months||[]
+  const [selected,setSelected]=useState(business.at(-1)?.month_start||'')
+  useEffect(()=>{if(!selected&&business.length)setSelected(business.at(-1)?.month_start||'')},[business.length])
+  const current=business.find(x=>x.month_start===selected)||business.at(-1)
+  const idx=business.findIndex(x=>x.month_start===current?.month_start)
+  const previous=idx>0?business[idx-1]:null
+  const fm=funnelMonths.find(x=>x.month_start===current?.month_start)||{}
+  if(!current)return <Empty text="Ainda não há dados suficientes para montar o relatório gerencial."/>
+  const labels=business.map(x=>shortMonth(x.month_start))
+  const fMap=new Map(funnelMonths.map(x=>[x.month_start,x]))
+  const clickToLpv=Number(fm.click_to_lpv||0),lpvToCart=Number(fm.lpv_to_cart||0),cartToCheckout=Number(fm.cart_to_checkout||0),checkoutToPurchase=Number(fm.checkout_to_purchase||0)
+  const leaks=[['Clique → página',clickToLpv],['Página → carrinho',lpvToCart],['Carrinho → checkout',cartToCheckout],['Checkout → compra',checkoutToPurchase]].sort((a,b)=>a[1]-b[1])
+  const biggest=leaks[0]
+  const cpmD=delta(fm.cpm,fMap.get(previous?.month_start)?.cpm),cpcD=delta(fm.cpc,fMap.get(previous?.month_start)?.cpc),ctrD=delta(fm.ctr,fMap.get(previous?.month_start)?.ctr),freqD=delta(fm.frequency,fMap.get(previous?.month_start)?.frequency)
+  return <div className="page executive-page"><PageHeader eyebrow="RELATÓRIO GERENCIAL" title="Visão executiva da operação" text="Shopify para resultado real. Meta Ads para mídia, atribuição e eficiência de entrega." right={<div className="month-control"><span>Mês analisado</span><select value={current.month_start} onChange={e=>setSelected(e.target.value)}>{business.slice().reverse().map(x=><option key={x.month_start} value={x.month_start}>{monthLabel(x.month_start)}</option>)}</select></div>}/>
+    <div className="hero-strip"><div><span>Resultado real Shopify</span><strong>{money(current.shopify_revenue)}</strong><small>{integer(current.shopify_orders)} pedidos · conversão {pct(Number(current.conversion_rate||0)*100)}</small></div><div className="hero-divider"/><div><span>Investimento em mídia</span><strong>{money(current.meta_spend)}</strong><small>MER {num(current.mer)} · ROAS Meta {num(current.meta_roas)}</small></div><div className="hero-insight"><span>LEITURA DO MÊS</span><p>{biggest?`O maior gargalo do funil pago está em ${biggest[0]}, com ${pct(biggest[1])} de passagem.`:'Aguardando funil completo.'}</p></div></div>
+    <div className="metrics-grid six"><Kpi label="Investimento Meta" value={money(current.meta_spend)} note={deltaText(current.meta_spend,previous?.meta_spend)} deltaValue={delta(current.meta_spend,previous?.meta_spend)} positive={false}/><Kpi label="Receita Shopify" value={money(current.shopify_revenue)} note={deltaText(current.shopify_revenue,previous?.shopify_revenue)} deltaValue={delta(current.shopify_revenue,previous?.shopify_revenue)} accent/><Kpi label="Pedidos" value={integer(current.shopify_orders)} note={deltaText(current.shopify_orders,previous?.shopify_orders)} deltaValue={delta(current.shopify_orders,previous?.shopify_orders)}/><Kpi label="MER" value={num(current.mer)} note={deltaText(current.mer,previous?.mer)} deltaValue={delta(current.mer,previous?.mer)}/><Kpi label="ROAS Meta" value={num(current.meta_roas)} note={deltaText(current.meta_roas,previous?.meta_roas)} deltaValue={delta(current.meta_roas,previous?.meta_roas)}/><Kpi label="Conversão Shopify" value={pct(Number(current.conversion_rate||0)*100)} note={deltaText(current.conversion_rate,previous?.conversion_rate)} deltaValue={delta(current.conversion_rate,previous?.conversion_rate)}/></div>
+    <SectionTitle index="01" eyebrow="FUNIL DE AQUISIÇÃO" title="Do anúncio até a compra" text="O caminho completo entre clique, chegada na página, intenção de compra e conversão final."/>
+    <div className="grid-two"><section className="surface large"><div className="card-heading"><div><span className="overline">META ADS</span><h3>Funil pago</h3><p>Eventos atribuídos pelo Meta, usados para entender eficiência por etapa.</p></div></div><Funnel rows={[['Cliques no link',fm.link_clicks],['Visualizações da página',fm.landing_page_views],['Carrinhos',fm.adds_to_cart],['Checkout',fm.initiates_checkout],['Compras',fm.purchases]].map(([label,value])=>({label,value}))}/><div className="rate-grid"><Rate label="Clique → página" value={clickToLpv}/><Rate label="Página → carrinho" value={lpvToCart}/><Rate label="Carrinho → checkout" value={cartToCheckout}/><Rate label="Checkout → compra" value={checkoutToPurchase}/></div></section><section className="surface large"><div className="card-heading"><div><span className="overline">SHOPIFY</span><h3>Funil real do site</h3><p>Sessões e conversões reais da loja, sem depender da atribuição do Meta.</p></div></div><Funnel rows={[['Sessões',current.sessions],['Carrinhos',current.cart_additions],['Checkout',current.reached_checkout],['Compras',current.completed_checkout||current.shopify_orders]].map(([label,value])=>({label,value}))}/><div className="insight-box"><span>PRINCIPAL PONTO DE ATENÇÃO</span><strong>{biggest?.[0]||'—'}</strong><p>{biggest?`Apenas ${pct(biggest[1])} avança nessa transição. É o primeiro ponto a investigar antes de alterar todo o restante da operação.`:'Sem leitura disponível.'}</p></div></section></div>
+    <SectionTitle index="02" eyebrow="EFICIÊNCIA DE ENTREGA" title="CPM, CPC, CTR e frequência" text="Não basta olhar o valor atual. O comportamento dos indicadores mostra pressão de leilão, atenção e custo de tráfego."/>
+    <div className="metrics-grid four"><Kpi label="CPM" value={money(fm.cpm)} note={deltaText(fm.cpm,fMap.get(previous?.month_start)?.cpm)} deltaValue={cpmD} positive={false}/><Kpi label="CPC" value={money(fm.cpc)} note={deltaText(fm.cpc,fMap.get(previous?.month_start)?.cpc)} deltaValue={cpcD} positive={false}/><Kpi label="CTR" value={pct(fm.ctr)} note={deltaText(fm.ctr,fMap.get(previous?.month_start)?.ctr)} deltaValue={ctrD}/><Kpi label="Frequência" value={num(fm.frequency)} note={deltaText(fm.frequency,fMap.get(previous?.month_start)?.frequency)} deltaValue={freqD} positive={false}/></div>
+    <div className="grid-two charts"><ChartBox title="CPM" subtitle="Custo para mil impressões" labels={labels} datasets={[{label:'CPM',data:business.map(x=>Number(fMap.get(x.month_start)?.cpm||0)),borderColor:'#6b2d68',backgroundColor:'rgba(107,45,104,.08)',fill:true,borderWidth:3,tension:.35,pointRadius:3}]}/><ChartBox title="CPC" subtitle="Custo por clique" labels={labels} datasets={[{label:'CPC',data:business.map(x=>Number(fMap.get(x.month_start)?.cpc||0)),borderColor:'#9d617f',backgroundColor:'rgba(157,97,127,.08)',fill:true,borderWidth:3,tension:.35,pointRadius:3}]}/><ChartBox title="CTR" subtitle="Taxa de clique" labels={labels} datasets={[{label:'CTR',data:business.map(x=>Number(fMap.get(x.month_start)?.ctr||0)),borderColor:'#4f3b56',borderWidth:3,tension:.35,pointRadius:3}]}/><ChartBox title="Frequência" subtitle="Pressão média de exposição" labels={labels} datasets={[{label:'Frequência',data:business.map(x=>Number(fMap.get(x.month_start)?.frequency||0)),borderColor:'#b08096',borderWidth:3,tension:.35,pointRadius:3}]}/></div>
+    <SectionTitle index="03" eyebrow="NEGÓCIO" title="Receita, investimento e eficiência" text="A leitura executiva fecha mídia e resultado comercial na mesma linha do tempo."/>
+    <div className="grid-two"><ChartBox title="Receita × investimento" labels={labels} datasets={[{label:'Receita Shopify',data:business.map(x=>Number(x.shopify_revenue||0)),borderColor:'#6b2d68',borderWidth:3,tension:.35,pointRadius:3},{label:'Investimento Meta',data:business.map(x=>Number(x.meta_spend||0)),borderColor:'#c3a2b2',borderWidth:2,tension:.35,pointRadius:3}]}/><ChartBox title="MER × ROAS Meta" labels={labels} datasets={[{label:'MER',data:business.map(x=>Number(x.mer||0)),borderColor:'#6b2d68',borderWidth:3,tension:.35,pointRadius:3},{label:'ROAS Meta',data:business.map(x=>Number(x.meta_roas||0)),borderColor:'#a98a99',borderWidth:2,tension:.35,pointRadius:3}]}/></div>
   </div>
 }
 
-function Manager({ data, refresh }) {
-  const ctx = data?.manager?.context || {}
-  const summary = ctx.last_reasoning_summary || {}
-  const business = data?.shopify?.business || []
-  const currentMonth = business.at(-1)
-  const decision = (data?.manager?.decisions || []).find(x => x.status === 'open') || (data?.manager?.decisions || [])[0]
-  const action = decision?.recommended_action || {}
-  return <div className="page"><div className="page-title-row"><div><div className="eyebrow">CONSULTOR IA</div><h1>O que está acontecendo e o que fazer agora</h1><p>{summary.reason || 'Análise contínua Meta + Shopify.'}</p></div><button className="secondary" onClick={refresh}>Atualizar consultor</button></div>
-    <div className="kpi-grid four"><Kpi label="ROAS Meta 3d" value={num(summary.current_3d?.roas)} /><Kpi label={`Pedidos Shopify · ${monthLabel(currentMonth?.month_start)}`} value={integer(currentMonth?.shopify_orders)} /><Kpi label="Receita Shopify" value={money(currentMonth?.shopify_revenue)} /><Kpi label="MER" value={num(currentMonth?.mer)} /></div>
-    <div className="grid2"><section className="panel"><div className="eyebrow">DIAGNÓSTICO PRINCIPAL</div><h2>{decision?.title || 'Sem decisão crítica aberta'}</h2><p>{action.diagnosis || action.executive_summary || decision?.rationale || 'Monitorando a operação.'}</p></section><section className="panel"><div className="eyebrow">PLANO DE AÇÃO</div><h2>{action.exact_action || 'Continuar monitorando até haver evidência suficiente.'}</h2><p>{action.expected_impact || ''}</p></section></div>
+function Rate({label,value}){return <div className="rate-card"><span>{label}</span><strong>{pct(value||0)}</strong></div>}
+function PageHeader({eyebrow,title,text,right}){return <div className="page-header"><div><span className="overline">{eyebrow}</span><h1>{title}</h1><p>{text}</p></div>{right}</div>}
+
+function Manager({data,refresh,onOpen}){
+  const ctx=data?.manager?.context||{},sum=ctx.last_reasoning_summary||{},business=data?.shopify?.business||[],month=business.at(-1),decision=(data?.manager?.decisions||[]).find(x=>x.status==='open')||(data?.manager?.decisions||[])[0],a=decision?.recommended_action||{},states=data?.manager?.states||[],breakdowns=sum.breakdowns||{}
+  const counts=useMemo(()=>states.reduce((acc,s)=>{acc[s.state]=(acc[s.state]||0)+1;return acc},{}),[states])
+  const signalRows=[['CTR',sum.delta?.ctr3],['CPM',sum.delta?.cpm3],['CPC',sum.delta?.cpc3],['ROAS Meta',sum.delta?.roas3]].filter(x=>x[1]!=null)
+  return <div className="page"><PageHeader eyebrow="GESTOR IA" title="O que está acontecendo e o que fazer agora" text={sum.reason||'Análise contínua cruzando sinais de mídia e resultado comercial.'} right={<button className="outline-btn" onClick={refresh}>Atualizar análise</button>}/>
+    <div className="manager-hero"><div><span className="overline light">ESTADO ATUAL</span><h2>{sum.mode==='historical_test'?'Modo histórico de teste':sum.analysis_state||sum.state||'Monitorando'}</h2><p>Dados Meta até {sum.max_metric_date||'—'} · última análise {fmtDate(ctx.last_reasoning_at)}</p></div><div className="manager-kpis"><div><span>Pedidos Shopify · mês</span><strong>{integer(month?.shopify_orders)}</strong></div><div><span>Receita Shopify · mês</span><strong>{money(month?.shopify_revenue)}</strong></div><div><span>MER</span><strong>{num(month?.mer)}</strong></div><div><span>ROAS Meta · 3d</span><strong>{num(sum.current_3d?.roas)}</strong></div></div></div>
+    <div className="grid-two manager-main"><section className="surface decision-panel"><span className="overline">DIAGNÓSTICO PRINCIPAL</span><h2>{decision?.title||'Sem decisão crítica aberta'}</h2><p className="lead">{a.diagnosis||a.executive_summary||decision?.rationale||'O gestor continua monitorando a operação.'}</p><div className="evidence-list">{(a.evidence_summary||[]).slice(0,5).map((x,i)=><div key={i}><span>0{i+1}</span><p>{x}</p></div>)}</div>{decision&&<button className="text-btn" onClick={()=>onOpen(decision.id)}>Abrir diagnóstico completo →</button>}</section><section className="surface action-panel"><span className="overline">PLANO DE AÇÃO</span><h2>{a.exact_action||'Preservar o controle e continuar observando.'}</h2><p>{a.expected_impact||'A ação recomendada deve atacar a causa mais provável sem alterar várias variáveis ao mesmo tempo.'}</p><div className="steps">{(a.execution_steps||[a.exact_action]).filter(Boolean).map((x,i)=><div key={i}><span>{i+1}</span><p>{x}</p></div>)}</div><div className="validation"><div><small>Janela</small><b>{a.validation_window_days||3} dias</b></div><div><small>Risco</small><b>{a.risk||'Controlado'}</b></div><div><small>Métrica</small><b>{a.success_criteria?.primary||'eficiência real'}</b></div></div></section></div>
+    <SectionTitle index="01" eyebrow="SINAIS" title="O que mudou recentemente" text="Mudanças relativas usadas pelo gestor para entender onde a deterioração começou."/>
+    <div className="signal-grid">{signalRows.map(([label,v])=><div className="signal-card" key={label}><span>{label}</span><strong className={tone(label==='CPM'||label==='CPC'?-Number(v):Number(v))}>{Number(v)>=0?'+':''}{num(v,1)}%</strong><small>últimos 3 dias vs 3 anteriores</small></div>)}</div>
+    <SectionTitle index="02" eyebrow="ESTADO OPERACIONAL" title="Campanhas, anúncios e criativos" text="O gestor classifica entidades por comportamento para priorizar investigação e ação."/>
+    <div className="state-strip">{['WINNER','HEALTHY','FATIGUING','NEEDS_REVIEW','TESTING','MONITORING'].map(k=><div key={k}><span>{k.replaceAll('_',' ')}</span><strong>{counts[k]||0}</strong></div>)}</div>
+    <div className="grid-two"><Breakdown title="Placements com maior gasto" rows={breakdowns.placement}/><Breakdown title="Plataformas" rows={breakdowns.platform}/></div>
   </div>
 }
 
-function Approvals({ data, onOpen }) {
-  const decisions = (data?.manager?.decisions || []).filter(x => x.model === 'traffic-manager-v3')
-  return <div className="page"><div className="eyebrow">CENTRAL DE APROVAÇÕES</div><h1>Decisões do Gestor IA</h1><div className="cards">{decisions.length ? decisions.map(d => <article className="card" key={d.id}><div><span className="pill">{d.status || 'open'}</span><h3>{d.title}</h3><p>{d.recommended_action?.executive_summary || d.rationale}</p></div><div className="card-actions"><button onClick={() => onOpen(d.id)}>Ver diagnóstico</button></div></article>) : <Empty text="Nenhuma decisão disponível." />}</div></div>
+function Breakdown({title,rows=[]}){return <section className="surface"><div className="card-heading"><div><span className="overline">BREAKDOWN</span><h3>{title}</h3></div></div><div className="table-list">{rows?.length?rows.slice(0,7).map((r,i)=><div key={i}><span>{r.key||'—'}</span><b>{money(r.spend)}</b><em>CTR {pct(r.ctr)} · ROAS {num(r.roas)}</em></div>):<Empty text="Sem dados suficientes."/>}</div></section>}
+
+function Approvals({data,onOpen}){
+  const [filter,setFilter]=useState('open'),all=(data?.manager?.decisions||[]).filter(x=>x.model==='traffic-manager-v3'),status=d=>String(d.status||'open').toLowerCase(),list=all.filter(d=>status(d)===filter)
+  const tabs=[['open','Pendentes'],['approved','Aprovadas'],['executed','Executadas'],['rejected','Rejeitadas']]
+  return <div className="page"><PageHeader eyebrow="CENTRAL DE APROVAÇÕES" title="Decisões maduras do Gestor IA" text="Recomendações que já passaram por diagnóstico e podem ser revisadas com contexto antes da execução."/><div className="tabs">{tabs.map(([k,l])=><button key={k} className={filter===k?'active':''} onClick={()=>setFilter(k)}>{l}<span>{all.filter(x=>status(x)===k).length}</span></button>)}</div><div className="decision-list">{list.length?list.map(d=>{const a=d.recommended_action||{};return <article className="decision-card" key={d.id}><div className="decision-index">{String(all.indexOf(d)+1).padStart(2,'0')}</div><div className="decision-content"><div className="decision-meta"><span>{a.priority||d.severity||'análise'}</span><span>{status(d)}</span></div><h2>{d.title}</h2><p>{a.executive_summary||d.rationale}</p><div className="decision-action"><small>AÇÃO SUGERIDA</small><strong>{a.exact_action||'Abrir diagnóstico para revisar a recomendação.'}</strong></div></div><div className="decision-cta"><button onClick={()=>onOpen(d.id)}>Ver diagnóstico</button></div></article>}):<Empty text="Nenhuma decisão nesta etapa."/>}</div></div>
 }
 
-function DiagnosticModal({ id, onClose }) {
-  const [data, setData] = useState(null)
-  useEffect(() => { api(`${endpoints.manager}?decision_id=${encodeURIComponent(id)}`).then(setData).catch(() => setData({ error: true })) }, [id])
-  return <div className="modal-bg" onMouseDown={e => e.target === e.currentTarget && onClose()}><div className="modal"><button className="modal-close" onClick={onClose}>Fechar</button>{!data ? <Empty text="Carregando diagnóstico…" /> : data.error ? <Empty text="Não foi possível carregar o diagnóstico." /> : <><div className="eyebrow">DIAGNÓSTICO DO CONSULTOR IA</div><h1>{data.explain?.title || data.decision?.title}</h1><p>{data.explain?.diagnosis || data.decision?.rationale}</p><SectionTitle n="01" title="Evidências" text="Sinais usados para sustentar a recomendação." /><div className="panel">{(data.explain?.evidence || data.decision?.recommended_action?.evidence_summary || []).map((x, i) => <p key={i}>• {x}</p>)}</div><SectionTitle n="02" title="Ação recomendada" text="Próximo passo sugerido pelo Gestor." /><div className="panel"><h3>{data.explain?.action || data.decision?.recommended_action?.exact_action}</h3></div></>}</div></div>
+function Analysis({data}){
+  const sum=data?.manager?.context?.last_reasoning_summary||{},b=sum.breakdowns||{}
+  return <div className="page"><PageHeader eyebrow="ANÁLISE DETALHADA" title="Cruze os sinais antes de decidir" text="Leitura por plataforma, placement, dispositivo e região para localizar onde performance e custo se afastam."/><div className="analysis-grid"><Breakdown title="Placements" rows={b.placement}/><Breakdown title="Plataformas" rows={b.platform}/><Breakdown title="Dispositivos" rows={b.device}/><Breakdown title="Regiões" rows={b.region}/></div></div>
 }
 
-function GenericPage({ title }) { return <div className="page"><div className="eyebrow">SKIN BEAUTY</div><h1>{title}</h1><p>Esta rota já está sob o novo frontend GitHub e será portada para o novo componente sem reintroduzir o frontend antigo.</p></div> }
-function Empty({ text }) { return <div className="empty">{text}</div> }
-function SectionTitle({ n, title, text }) { return <div className="section-title"><div><span>{n}</span><h2>{title}</h2></div><p>{text}</p></div> }
+function Creatives({data}){
+  const states=(data?.manager?.states||[]).filter(x=>x.entity_type==='creative').sort((a,b)=>Number(b.metrics_snapshot?.current_7d?.spend||0)-Number(a.metrics_snapshot?.current_7d?.spend||0))
+  return <div className="page"><PageHeader eyebrow="CRIATIVOS" title="Performance e estado de cada criativo" text="WINNER, FATIGUING, TESTING e NEEDS REVIEW em uma visão operacional simples."/><div className="creative-grid">{states.length?states.map((s,i)=>{const m=s.metrics_snapshot?.current_7d||{};return <article className="creative-card" key={`${s.entity_id}-${i}`}><div className="creative-thumb"><span>{String(i+1).padStart(2,'0')}</span></div><div className="creative-body"><div className="creative-state">{s.state}</div><h3>{s.metrics_snapshot?.name||`Criativo ${s.entity_id?.slice?.(-6)||i+1}`}</h3><p>{s.state_reason}</p><div className="creative-metrics"><div><span>Gasto</span><b>{money(m.spend)}</b></div><div><span>CTR</span><b>{pct(m.ctr)}</b></div><div><span>ROAS</span><b>{num(m.roas)}</b></div><div><span>Compras</span><b>{integer(m.purchases)}</b></div></div></div></article>}):<Empty text="Ainda não há estados de criativos suficientes."/>}</div></div>
+}
 
-export default function App() {
-  const [session, setSessionState] = useState(getSession())
-  const [tab, setTab] = useState('manager')
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [diag, setDiag] = useState(null)
-  async function refresh() { setLoading(true); try { setData(await loadCoreData()) } catch (e) { console.error(e) } finally { setLoading(false) } }
-  useEffect(() => { if (session?.token) refresh() }, [session?.token])
-  if (!session?.token) return <Login onSuccess={() => setSessionState(getSession())} />
-  const labels = Object.fromEntries(nav)
-  return <div className="app-shell"><aside className="sidebar"><div className="brand">SKIN BEAUTY</div><div className="subbrand">AI TRAFFIC MANAGER</div><nav>{nav.map(([key, label]) => <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</nav><button className="logout" onClick={() => { clearSession(); setSessionState(null) }}>Sair</button></aside><main className="content">{loading && !data ? <Empty text="Carregando dados…" /> : tab === 'manager' ? <Manager data={data} refresh={refresh} /> : tab === 'executive' ? <Executive data={data} /> : tab === 'approvals' ? <Approvals data={data} onOpen={setDiag} /> : <GenericPage title={labels[tab]} />}</main>{diag && <DiagnosticModal id={diag} onClose={() => setDiag(null)} />}</div>
+function EntityPage({data,type,title,eyebrow}){
+  const states=(data?.manager?.states||[]).filter(x=>x.entity_type===type)
+  return <div className="page"><PageHeader eyebrow={eyebrow} title={title} text="Visão operacional alimentada pelo motor do Gestor IA."/><div className="entity-table"><div className="entity-head"><span>Entidade</span><span>Estado</span><span>Gasto 7d</span><span>CTR</span><span>ROAS</span></div>{states.length?states.map((s,i)=>{const m=s.metrics_snapshot?.current_7d||{};return <div className="entity-row" key={`${s.entity_id}-${i}`}><div><b>{s.metrics_snapshot?.name||s.entity_id||`${type} ${i+1}`}</b><small>{s.state_reason}</small></div><span className="status-chip">{s.state}</span><strong>{money(m.spend)}</strong><strong>{pct(m.ctr)}</strong><strong>{num(m.roas)}</strong></div>}):<Empty text="Sem entidades classificadas nesta visão."/>}</div></div>
+}
+
+function Placements({data}){return <div className="page"><PageHeader eyebrow="PLACEMENTS" title="Onde a mídia está sendo entregue" text="Compare feed, stories, reels e demais posições pelo custo e retorno."/><Breakdown title="Ranking de placements" rows={data?.manager?.context?.last_reasoning_summary?.breakdowns?.placement}/></div>}
+function Audiences({data}){const rows=data?.manager?.context?.last_reasoning_summary?.breakdowns?.region||[];return <div className="page"><PageHeader eyebrow="PÚBLICOS" title="Leitura de audiência e região" text="Uma visão inicial do comportamento disponível no histórico atual."/><Breakdown title="Regiões com entrega" rows={rows}/></div>}
+function Waste({data}){const states=(data?.manager?.states||[]).filter(x=>['NEEDS_REVIEW','FATIGUING','ALERT'].includes(x.state));return <div className="page"><PageHeader eyebrow="DESPERDÍCIOS" title="Onde revisar gasto antes de escalar" text="Entidades marcadas pelo gestor como risco, fadiga ou necessidade de revisão."/><div className="decision-list">{states.length?states.map((s,i)=><article className="decision-card compact" key={i}><div className="decision-index">{String(i+1).padStart(2,'0')}</div><div className="decision-content"><div className="decision-meta"><span>{s.entity_type}</span><span>{s.state}</span></div><h2>{s.metrics_snapshot?.name||s.entity_id}</h2><p>{s.state_reason}</p></div><div className="decision-cta"><strong>{money(s.metrics_snapshot?.current_7d?.spend)}</strong><small>gasto 7d</small></div></article>):<Empty text="Nenhum desperdício relevante classificado agora."/>}</div></div>}
+function Integrations({data}){const q=data?.manager?.quality||data?.manager?.context?.last_reasoning_summary?.quality;return <div className="page"><PageHeader eyebrow="INTEGRAÇÕES" title="Saúde das fontes de dados" text="O painel separa resultado real da Shopify e atribuição/performance do Meta."/><div className="integration-grid"><div className="integration-card"><div className="integration-icon">M</div><div><span>Meta Ads</span><strong>{q?.status==='healthy'?'Conectado':'Histórico / acesso limitado'}</strong><p>{q?.details?.reason||q?.details?.sync?.error_message||'Métricas de mídia e atribuição.'}</p></div></div><div className="integration-card"><div className="integration-icon">S</div><div><span>Shopify</span><strong>Conectado</strong><p>Receita, pedidos, sessões, carrinhos e checkout usados como verdade comercial.</p></div></div></div></div>}
+
+function DiagnosticModal({id,onClose}){
+  const [data,setData]=useState(null)
+  useEffect(()=>{api(`${endpoints.manager}?decision_id=${encodeURIComponent(id)}`).then(setData).catch(()=>setData({error:true}))},[id])
+  return <div className="modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&onClose()}><div className="diagnostic-modal"><button className="modal-close" onClick={onClose}>Fechar</button>{!data?<Empty text="Montando diagnóstico…"/>:data.error?<Empty text="Não foi possível carregar o diagnóstico."/>:<><span className="overline">DIAGNÓSTICO DO CONSULTOR IA</span><h1>{data.explain?.title||data.decision?.title}</h1><p className="modal-lead">{data.explain?.diagnosis||data.decision?.rationale}</p><SectionTitle index="01" eyebrow="EVIDÊNCIAS" title="O que sustenta essa leitura" text="Sinais usados pelo gestor para chegar à recomendação."/><div className="surface evidence-modal">{(data.explain?.evidence||data.decision?.recommended_action?.evidence_summary||[]).map((x,i)=><div key={i}><span>{String(i+1).padStart(2,'0')}</span><p>{x}</p></div>)}</div><SectionTitle index="02" eyebrow="AÇÃO" title="O que fazer agora" text="A recomendação convertida em plano executável."/><div className="surface"><h2>{data.explain?.action||data.decision?.recommended_action?.exact_action}</h2><div className="steps">{(data.explain?.steps||data.decision?.recommended_action?.execution_steps||[]).map((x,i)=><div key={i}><span>{i+1}</span><p>{x}</p></div>)}</div></div></>}</div></div>
+}
+
+function Empty({text}){return <div className="empty-state">{text}</div>}
+
+export default function App(){
+  const [session,setSessionState]=useState(getSession()),[tab,setTab]=useState('manager'),[data,setData]=useState(null),[loading,setLoading]=useState(false),[diag,setDiag]=useState(null)
+  async function refresh(){setLoading(true);try{setData(await loadCoreData())}catch(e){console.error(e)}finally{setLoading(false)}}
+  useEffect(()=>{if(session?.token)refresh()},[session?.token])
+  if(!session?.token)return <Login onSuccess={()=>setSessionState(getSession())}/>
+  const page=tab==='manager'?<Manager data={data} refresh={refresh} onOpen={setDiag}/>:tab==='executive'?<Executive data={data}/>:tab==='approvals'?<Approvals data={data} onOpen={setDiag}/>:tab==='analysis'?<Analysis data={data}/>:tab==='creatives'?<Creatives data={data}/>:tab==='audiences'?<Audiences data={data}/>:tab==='placements'?<Placements data={data}/>:tab==='campaigns'?<EntityPage data={data} type="campaign" eyebrow="CAMPANHAS" title="Saúde e eficiência das campanhas"/>:tab==='sets'?<EntityPage data={data} type="ad_set" eyebrow="CONJUNTOS" title="Leitura operacional dos conjuntos"/>:tab==='ads'?<EntityPage data={data} type="ad" eyebrow="ANÚNCIOS" title="Estado e performance dos anúncios"/>:tab==='waste'?<Waste data={data}/>:<Integrations data={data}/>
+  return <div className="app-shell"><aside className="sidebar"><div className="brand-block"><div className="brand-mark">SB</div><div><strong>SKIN BEAUTY</strong><span>AI TRAFFIC MANAGER</span></div></div><div className="sidebar-scroll">{navGroups.map(g=><div className="nav-group" key={g.label}><small>{g.label}</small>{g.items.map(([key,label])=><button key={key} className={tab===key?'active':''} onClick={()=>setTab(key)}><span>{label}</span></button>)}</div>)}</div><div className="sidebar-footer"><div className="source-status"><span className="status-dot shop"/>Shopify conectado</div><div className="source-status"><span className="status-dot meta"/>Meta histórico</div><button onClick={()=>{clearSession();setSessionState(null)}}>Sair</button></div></aside><main className="main-content">{loading&&!data?<Empty text="Carregando inteligência da operação…"/>:page}</main>{diag&&<DiagnosticModal id={diag} onClose={()=>setDiag(null)}/>}</div>
 }
