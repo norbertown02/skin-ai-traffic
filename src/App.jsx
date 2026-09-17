@@ -2,12 +2,8 @@ import React, { useEffect, useState } from 'react'
 import Login from './components/Login.jsx'
 import Shell from './components/Shell.jsx'
 import DiagnosticModal from './components/DiagnosticModal.jsx'
-import ExecutivePage from './pages/ExecutivePage.jsx'
-import ManagerPage from './pages/ManagerPage.jsx'
 import ApprovalsPage from './pages/ApprovalsPage.jsx'
-import AnalysisPage from './pages/AnalysisPage.jsx'
-import CreativesPage from './pages/CreativesPage.jsx'
-import { AudiencesPage, EntityPage, IntegrationsPage, PlacementsPage, WastePage } from './pages/MediaPages.jsx'
+import { AnalysisPro, AudiencesPro, CreativesPro, EntityPro, ExecutivePro, IntegrationsPro, ManagerPro, PlacementsPro, WastePro } from './pages/ProPages.jsx'
 import { clearSession, getSession, loadCoreData } from './api.js'
 
 export default function App() {
@@ -30,18 +26,18 @@ export default function App() {
   if (!session?.token) return <Login onSuccess={() => setSession(getSession())} />
 
   const page = {
-    manager: <ManagerPage data={data} onOpen={setDiagnosticId} onRefresh={refresh} />,
-    executive: <ExecutivePage data={data} />,
+    manager: <ManagerPro data={data} onOpen={setDiagnosticId} onRefresh={refresh} />,
+    executive: <ExecutivePro data={data} />,
     approvals: <ApprovalsPage data={data} onOpen={setDiagnosticId} onRefresh={refresh} />,
-    analysis: <AnalysisPage data={data} />,
-    creatives: <CreativesPage data={data} />,
-    audiences: <AudiencesPage data={data} />,
-    placements: <PlacementsPage data={data} />,
-    campaigns: <EntityPage data={data} type="campaign" />,
-    sets: <EntityPage data={data} type="ad_set" />,
-    ads: <EntityPage data={data} type="ad" />,
-    waste: <WastePage data={data} />,
-    integrations: <IntegrationsPage data={data} />,
+    analysis: <AnalysisPro data={data} />,
+    creatives: <CreativesPro data={data} />,
+    audiences: <AudiencesPro data={data} />,
+    placements: <PlacementsPro data={data} />,
+    campaigns: <EntityPro data={data} type="campaign" />,
+    sets: <EntityPro data={data} type="ad_set" />,
+    ads: <EntityPro data={data} type="ad" />,
+    waste: <WastePro data={data} />,
+    integrations: <IntegrationsPro data={data} />,
   }[tab]
 
   return <Shell tab={tab} onTab={setTab} data={data} onLogout={() => { clearSession(); setSession(null); setData(null) }}>
