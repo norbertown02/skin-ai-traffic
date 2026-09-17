@@ -8,7 +8,10 @@ import CreativesClean from './pages/CreativesClean.jsx'
 import IntegrationsClean from './pages/IntegrationsClean.jsx'
 import ManagerDeep from './pages/ManagerDeep.jsx'
 import AnalysisDeep from './pages/AnalysisDeep.jsx'
-import { AudiencesPro, EntityPro, PlacementsPro, WastePro } from './pages/ProPages.jsx'
+import AudienceDeep from './pages/AudienceDeep.jsx'
+import PlacementDeep from './pages/PlacementDeep.jsx'
+import EntityDeep from './pages/EntityDeep.jsx'
+import WasteDeep from './pages/WasteDeep.jsx'
 import { api, clearSession, endpoints, getSession, loadCoreData } from './api.js'
 
 const validTabs = new Set(['manager','executive','approvals','analysis','creatives','audiences','placements','campaigns','sets','ads','waste','integrations'])
@@ -80,12 +83,12 @@ export default function App() {
     approvals: <ApprovalsPage data={data} onOpen={setDiagnosticId} onRefresh={refresh} />,
     analysis: <AnalysisDeep data={data} />,
     creatives: <CreativesClean data={data} />,
-    audiences: <AudiencesPro data={data} />,
-    placements: <PlacementsPro data={data} />,
-    campaigns: <EntityPro data={data} type="campaign" />,
-    sets: <EntityPro data={data} type="ad_set" />,
-    ads: <EntityPro data={data} type="ad" />,
-    waste: <WastePro data={data} />,
+    audiences: <AudienceDeep data={data} />,
+    placements: <PlacementDeep data={data} />,
+    campaigns: <EntityDeep data={data} type="campaign" />,
+    sets: <EntityDeep data={data} type="ad_set" />,
+    ads: <EntityDeep data={data} type="ad" />,
+    waste: <WasteDeep data={data} />,
     integrations: <IntegrationsClean data={data} />,
   }[tab]
 
