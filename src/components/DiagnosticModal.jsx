@@ -2,16 +2,17 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { ChartCard } from './Charts.jsx'
 import { Badge, MiniMetric, SectionHeader, Surface } from './UI.jsx'
 import { api, endpoints } from '../api.js'
-import { dateTime, money, num, pct, statusLabel } from '../lib/format.js'
+import { dateTime, num, statusLabel } from '../lib/format.js'
 
 export default function DiagnosticModal({ id, onClose, onRefresh }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
+  const [reviewError, setReviewError] = useState('')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     let active = true
-    setData(null); setError('')
+    setData(null); setError(''); setReviewError('')
     api(`${endpoints.manager}?decision_id=${encodeURIComponent(id)}`)
       .then(x => active && setData(x))
       .catch(e => active && setError(e.message || 'Falha ao carregar diagnóstico.'))
@@ -19,10 +20,10 @@ export default function DiagnosticModal({ id, onClose, onRefresh }) {
   }, [id])
 
   useEffect(() => {
-    const esc = e => e.key === 'Escape' && onClose?.()
+    const esc = e => e.key === 'Escape' && !busy && onClose?.()
     window.addEventListener('keydown', esc)
     return () => window.removeEventListener('keydown', esc)
-  }, [onClose])
+  }, [onClose, busy])
 
   const metaSeries = useMemo(() => data?.series?.meta || [], [data])
   const labels = metaSeries.map(x => String(x.date || '').slice(5))
@@ -34,17 +35,20 @@ export default function DiagnosticModal({ id, onClose, onRefresh }) {
   const success = explain.success && typeof explain.success === 'object' ? Object.entries(explain.success) : []
 
   async function review(review) {
-    setBusy(true)
+    if (busy) return
+    setBusy(true); setReviewError('')
     try {
       await api(endpoints.secure, { method: 'POST', body: JSON.stringify({ action: 'review', decision_id: id, review }) })
       await onRefresh?.()
       onClose?.()
+    } catch (e) {
+      setReviewError(e.message || 'Não foi possível registrar a decisão. O diagnóstico continua aberto.')
     } finally { setBusy(false) }
   }
 
-  return <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && onClose?.()}>
+  return <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && !busy && onClose?.()}>
     <div className="diagnostic-modal">
-      <div className="modal-topbar"><div><span>DIAGNÓSTICO DO GESTOR IA</span><small>Decisão {id?.slice?.(0, 8)}</small></div><button className="modal-close" onClick={onClose}>Fechar</button></div>
+      <div className="modal-topbar"><div><span>DIAGNÓSTICO DO GESTOR IA</span><small>Decisão {id?.slice?.(0, 8)}</small></div><button className="modal-close" disabled={busy} onClick={onClose}>Fechar</button></div>
       {!data && !error && <div className="modal-loading"><span/><p>Carregando diagnóstico, evidências e série histórica…</p></div>}
       {error && <div className="modal-loading error"><p>{error}</p></div>}
       {data && <div className="modal-content">
@@ -75,12 +79,8 @@ export default function DiagnosticModal({ id, onClose, onRefresh }) {
 
         <SectionHeader number="03" eyebrow="PLANO" title="Como executar e como validar" description="A recomendação só vira boa gestão quando tem passos claros, critério de sucesso e condição de rollback." />
         <div className="grid-two">
-          <Surface eyebrow="EXECUÇÃO" title="Passos sugeridos">
-            <div className="steps-list">{steps.length ? steps.map((step, i) => <div key={i}><span>{i + 1}</span><p>{typeof step === 'string' ? step : JSON.stringify(step)}</p></div>) : <p className="muted-copy">A ação principal acima é o passo recomendado. Não há subtarefas estruturadas adicionais.</p>}</div>
-          </Surface>
-          <Surface eyebrow="CRITÉRIO DE SUCESSO" title="O que precisa melhorar">
-            <div className="criteria-list">{success.length ? success.map(([key, value]) => <div key={key}><span>{key.replaceAll('_', ' ')}</span><strong>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</strong></div>) : <p className="muted-copy">Sem critério estruturado retornado.</p>}</div>
-          </Surface>
+          <Surface eyebrow="EXECUÇÃO" title="Passos sugeridos"><div className="steps-list">{steps.length ? steps.map((step, i) => <div key={i}><span>{i + 1}</span><p>{typeof step === 'string' ? step : JSON.stringify(step)}</p></div>) : <p className="muted-copy">A ação principal acima é o passo recomendado. Não há subtarefas estruturadas adicionais.</p>}</div></Surface>
+          <Surface eyebrow="CRITÉRIO DE SUCESSO" title="O que precisa melhorar"><div className="criteria-list">{success.length ? success.map(([key, value]) => <div key={key}><span>{key.replaceAll('_', ' ')}</span><strong>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</strong></div>) : <p className="muted-copy">Sem critério estruturado retornado.</p>}</div></Surface>
         </div>
 
         <div className="grid-two diagnostic-bottom">
@@ -88,6 +88,7 @@ export default function DiagnosticModal({ id, onClose, onRefresh }) {
           <Surface eyebrow="NÃO FAZER" title="Restrições e cuidados"><div className="dont-list">{dont.length ? dont.map((x, i) => <p key={i}>• {typeof x === 'string' ? x : JSON.stringify(x)}</p>) : <p className="diagnostic-text">Nenhuma restrição adicional registrada.</p>}</div></Surface>
         </div>
 
+        {reviewError && <div className="form-error">{reviewError}</div>}
         {decision.status === 'open' && <div className="modal-review-bar"><div><span>DECISÃO HUMANA NECESSÁRIA</span><p>Aprovar registra a decisão; a execução no Meta continua manual.</p></div><div><button className="btn subtle danger-text" disabled={busy} onClick={() => review('reject')}>Rejeitar</button><button className="btn primary" disabled={busy} onClick={() => review('approve')}>{busy ? 'Salvando…' : 'Aprovar recomendação'}</button></div></div>}
       </div>}
     </div>
