@@ -65,9 +65,16 @@ export default function App() {
 
   if (!session?.token) return <Login onSuccess={() => { setSession(getSession()); setError('') }} />
 
+  if (tab === 'executive') {
+    return <div className="executive-standalone">
+      {loading && !data ? <div className="app-loading"><div className="loading-mark">S</div><p>Carregando relatório…</p></div> : error && !data ? <div className="load-error"><h2>Não foi possível carregar o relatório</h2><p>{error}</p><button className="btn primary" onClick={refresh}>Tentar novamente</button></div> : <ExecutiveClean data={data} onBack={() => navigate('manager')} />}
+      {error && data && <div className="refresh-error">{error}</div>}
+      {loading && data && <div className="refresh-indicator">Atualizando dados…</div>}
+    </div>
+  }
+
   const page = {
     manager: <ManagerPro data={data} onOpen={setDiagnosticId} onRefresh={runManager} />,
-    executive: <ExecutiveClean data={data} />,
     approvals: <ApprovalsPage data={data} onOpen={setDiagnosticId} onRefresh={refresh} />,
     analysis: <AnalysisPro data={data} />,
     creatives: <CreativesClean data={data} />,
