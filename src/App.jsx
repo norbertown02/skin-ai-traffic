@@ -5,7 +5,7 @@ import DiagnosticModal from './components/DiagnosticModal.jsx'
 import ApprovalsPage from './pages/ApprovalsPage.jsx'
 import ExecutiveClean from './pages/ExecutiveClean.jsx'
 import { AnalysisPro, AudiencesPro, CreativesPro, EntityPro, IntegrationsPro, ManagerPro, PlacementsPro, WastePro } from './pages/ProPages.jsx'
-import { clearSession, getSession, loadCoreData } from './api.js'
+import { api, clearSession, endpoints, getSession, loadCoreData } from './api.js'
 
 export default function App() {
   const [session, setSession] = useState(getSession())
@@ -22,12 +22,22 @@ export default function App() {
     finally { setLoading(false) }
   }
 
+  async function runManager() {
+    setLoading(true); setError('')
+    try {
+      await api(endpoints.manager, { method: 'POST', body: JSON.stringify({ action: 'run' }) })
+      setData(await loadCoreData())
+    } catch (e) {
+      setError(e.message || 'Não foi possível atualizar a leitura do Gestor IA.')
+    } finally { setLoading(false) }
+  }
+
   useEffect(() => { if (session?.token) refresh() }, [session?.token])
 
   if (!session?.token) return <Login onSuccess={() => setSession(getSession())} />
 
   const page = {
-    manager: <ManagerPro data={data} onOpen={setDiagnosticId} onRefresh={refresh} />,
+    manager: <ManagerPro data={data} onOpen={setDiagnosticId} onRefresh={runManager} />,
     executive: <ExecutiveClean data={data} />,
     approvals: <ApprovalsPage data={data} onOpen={setDiagnosticId} onRefresh={refresh} />,
     analysis: <AnalysisPro data={data} />,
@@ -43,6 +53,7 @@ export default function App() {
 
   return <Shell tab={tab} onTab={setTab} data={data} onLogout={() => { clearSession(); setSession(null); setData(null) }}>
     {loading && !data ? <div className="app-loading"><div className="loading-mark">S</div><p>Carregando inteligência da operação…</p></div> : error && !data ? <div className="load-error"><h2>Não foi possível carregar o painel</h2><p>{error}</p><button className="btn primary" onClick={refresh}>Tentar novamente</button></div> : page}
+    {error && data && <div className="refresh-error">{error}</div>}
     {loading && data && <div className="refresh-indicator">Atualizando dados…</div>}
     {diagnosticId && <DiagnosticModal id={diagnosticId} onClose={() => setDiagnosticId(null)} onRefresh={refresh} />}
   </Shell>
