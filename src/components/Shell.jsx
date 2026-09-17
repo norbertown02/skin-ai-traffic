@@ -9,7 +9,7 @@ const groups = [
 ]
 
 const marks = {
-  manager: 'AI', executive: 'R', approvals: '✓', analysis: 'A', creatives: 'C', audiences: 'P', placements: 'PL', campaigns: 'CM', sets: 'CJ', ads: 'AD', waste: '!', integrations: '•',
+  manager: 'IA', executive: 'RG', approvals: 'OK', analysis: 'AN', creatives: 'CR', audiences: 'PU', placements: 'PL', campaigns: 'CA', sets: 'CJ', ads: 'AD', waste: 'DP', integrations: 'IN',
 }
 
 export default function Shell({ tab, onTab, data, onLogout, children }) {
@@ -17,14 +17,14 @@ export default function Shell({ tab, onTab, data, onLogout, children }) {
   const shopMonth = data?.shopify?.business?.at?.(-1)?.month_start
   return <div className="app-shell">
     <aside className="sidebar">
-      <div className="brand-block"><div className="brand-symbol">S</div><div><strong>SKIN BEAUTY</strong><span>AI TRAFFIC MANAGER</span></div></div>
+      <div className="brand-block"><div><strong>Skin Beauty</strong><span>Performance Intelligence</span></div></div>
       <div className="sidebar-scroll">{groups.map(group => <div className="nav-group" key={group.label}><small>{group.label}</small>{group.items.map(([key, label]) => <button key={key} className={tab === key ? 'active' : ''} onClick={() => onTab(key)}><i>{marks[key]}</i><span>{label}</span>{tab === key && <b />}</button>)}</div>)}</div>
       <div className="sidebar-status">
-        <div><span className="source-dot shop"/><div><strong>Shopify</strong><small>{shopMonth ? `Consolidado ${shopMonth.slice(5, 7)}/${shopMonth.slice(0, 4)}` : 'Conectado'}</small></div></div>
-        <div><span className="source-dot meta"/><div><strong>Meta Ads</strong><small>{metaDate ? `Histórico até ${metaDate.split('-').reverse().join('/')}` : 'Histórico'}</small></div></div>
+        <div><span className="source-dot shop"/><div><strong>Shopify</strong><small>{shopMonth ? `Consolidado ${shopMonth.slice(5, 7)}/${shopMonth.slice(0, 4)}` : 'Sem consolidado'}</small></div></div>
+        <div><span className="source-dot meta"/><div><strong>Meta Ads</strong><small>{metaDate ? `Histórico até ${metaDate.split('-').reverse().join('/')}` : 'Sem histórico'}</small></div></div>
       </div>
       <button className="logout-btn" onClick={onLogout}>Sair do painel</button>
     </aside>
-    <main className="main-content"><div className="mobile-brand"><strong>SKIN BEAUTY</strong><span>AI TRAFFIC MANAGER</span></div>{children}</main>
+    <main className="main-content"><div className="mobile-brand"><strong>Skin Beauty</strong><span>Performance Intelligence</span></div>{children}</main>
   </div>
 }
