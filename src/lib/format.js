@@ -43,6 +43,38 @@ export const cleanAdName = (value, fallback = 'Anúncio') => {
   return s || fallback
 }
 
+export const cleanCreativeName = (value, fallback = 'Criativo') => {
+  let s = String(value || '').trim()
+  if (!s) return fallback
+
+  s = s
+    .replace(/^\s*(?:20\d{2}[-_/.]\d{1,2}[-_/.]\d{1,2}|\d{1,2}[-_/.]\d{1,2}[-_/.]20\d{2})\s*[-_|:/]*/i, '')
+    .replace(/^\s*(?:20\d{2}\d{2}\d{2}|\d{8})\s*[-_|:/]*/i, '')
+    .replace(/\b(?:20\d{2}[-_/.]\d{1,2}[-_/.]\d{1,2}|\d{1,2}[-_/.]\d{1,2}[-_/.]20\d{2})\b/g, '')
+    .replace(/\b(?:creative|criativo|ad|an[uú]ncio)?[\s_-]*\d{10,}\b/gi, '')
+    .replace(/\b\d{10,}\b/g, '')
+    .replace(/[([]\s*\d{10,}\s*[)\]]/g, '')
+    .replace(/\b(?:copy|c[oó]pia|duplicado|duplicate)\b/gi, '')
+    .replace(/[_|]+/g, ' ')
+    .replace(/\s*[-–—:/]+\s*/g, ' · ')
+    .replace(/(?:\s*·\s*){2,}/g, ' · ')
+    .replace(/^\s*·\s*|\s*·\s*$/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
+  if (!s) return fallback
+
+  const words = s.split(' ').filter(Boolean)
+  const cleaned = words.map(word => {
+    if (/^(ugc|vsl|cta|reels?|stories?|feed|meta|fb|ig|ads?)$/i.test(word)) return word.toUpperCase()
+    if (/^[A-Z0-9]{2,6}$/.test(word)) return word
+    if (/^\d{1,3}$/.test(word)) return word
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+  }).join(' ')
+
+  return cleaned || fallback
+}
+
 export const cleanAdText = (value) => {
   if (value === null || value === undefined) return '—'
   if (typeof value !== 'string') return value
