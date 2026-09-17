@@ -5,6 +5,7 @@ import './styles.css'
 import './pro.css'
 import './exec-clean.css'
 import './skin-brand.css'
+import './app-v2.css'
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
