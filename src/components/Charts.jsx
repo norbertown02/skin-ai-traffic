@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react'
 import Chart from 'chart.js/auto'
 
-const baseGrid = 'rgba(92,61,82,.08)'
-const tick = '#8d7b88'
+const baseGrid = 'rgba(77,31,89,.07)'
+const tick = '#847985'
 
 export function ChartCard({ title, subtitle, labels, datasets, type = 'line', height = 280, options = {}, eyebrow = 'EVOLUÇÃO' }) {
   const ref = useRef(null)
@@ -16,12 +16,12 @@ export function ChartCard({ title, subtitle, labels, datasets, type = 'line', he
         maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: { display: datasets.length > 1, labels: { usePointStyle: true, boxWidth: 8, color: '#6f5c6a', font: { size: 11, family: 'DM Sans' } } },
-          tooltip: { padding: 12, backgroundColor: '#2b162a', titleFont: { family: 'DM Sans' }, bodyFont: { family: 'DM Sans' } },
+          legend: { display: datasets.length > 1, labels: { usePointStyle: true, boxWidth: 8, color: '#6f626d', font: { size: 11, family: 'Inter' } } },
+          tooltip: { padding: 13, cornerRadius: 2, backgroundColor: '#321238', titleFont: { family: 'Inter', weight: '600' }, bodyFont: { family: 'Inter' } },
         },
         scales: {
-          x: { grid: { display: false }, ticks: { color: tick, font: { size: 10, family: 'DM Sans' }, maxRotation: 0 } },
-          y: { grid: { color: baseGrid }, ticks: { color: tick, font: { size: 10, family: 'DM Sans' } } },
+          x: { border: { display: false }, grid: { display: false }, ticks: { color: tick, font: { size: 10, family: 'Inter' }, maxRotation: 0 } },
+          y: { border: { display: false }, grid: { color: baseGrid }, ticks: { color: tick, font: { size: 10, family: 'Inter' } } },
         },
         ...options,
       },
@@ -47,8 +47,8 @@ export function RetentionChart({ retention, height = 220 }) {
     if (!ref.current) return
     const instance = new Chart(ref.current, {
       type: 'line',
-      data: { labels: ['Start', '25%', '50%', '75%', '95%', '100%'], datasets: [{ data, borderColor: '#6d2f69', backgroundColor: 'rgba(109,47,105,.08)', fill: true, borderWidth: 3, tension: .35, pointRadius: 3 }] },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: tick, font: { size: 10 } } }, y: { min: 0, max: 100, grid: { color: baseGrid }, ticks: { color: tick, callback: v => `${v}%`, font: { size: 10 } } } } },
+      data: { labels: ['Start', '25%', '50%', '75%', '95%', '100%'], datasets: [{ data, borderColor: '#4d1f59', backgroundColor: 'rgba(77,31,89,.07)', fill: true, borderWidth: 2.5, tension: .35, pointRadius: 2.5 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { backgroundColor: '#321238', cornerRadius: 2 } }, scales: { x: { border: { display: false }, grid: { display: false }, ticks: { color: tick, font: { size: 10, family: 'Inter' } } }, y: { border: { display: false }, min: 0, max: 100, grid: { color: baseGrid }, ticks: { color: tick, callback: v => `${v}%`, font: { size: 10, family: 'Inter' } } } } },
     })
     return () => instance.destroy()
   }, [JSON.stringify(data)])
