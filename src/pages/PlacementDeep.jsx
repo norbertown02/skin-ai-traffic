@@ -1,0 +1,18 @@
+import React, { useMemo } from 'react'
+import { HorizontalBars } from '../components/Charts.jsx'
+import { DataTable, PageHeader, SectionHeader, Surface } from '../components/UI.jsx'
+import { integer, money, num, pct } from '../lib/format.js'
+const n=v=>Number(v||0)
+export default function PlacementDeep({data}){
+ const rows=data?.deep?.cross?.creative_placement_set||[]
+ const agg=useMemo(()=>{const m=new Map();for(const r of rows){const k=`${r.publisher_platform||'—'} · ${r.platform_position||'—'}`,x=m.get(k)||{key:k,spend:0,impressions:0,clicks:0,purchases:0,revenue:0};x.spend+=n(r.spend);x.impressions+=n(r.impressions);x.clicks+=n(r.clicks);x.purchases+=n(r.purchases);x.revenue+=n(r.revenue);m.set(k,x)}return[...m.values()].map(x=>({...x,ctr:x.impressions?x.clicks/x.impressions*100:0,cpc:x.clicks?x.spend/x.clicks:0,cac:x.purchases?x.spend/x.purchases:0,roas:x.spend?x.revenue/x.spend:0})).sort((a,b)=>b.spend-a.spend)},[rows])
+ const best=agg.filter(x=>x.spend>=20).slice().sort((a,b)=>b.roas-a.roas)[0], costly=agg.filter(x=>x.spend>=20).slice().sort((a,b)=>b.cac-a.cac)[0]
+ return <div className="page deep-page"><PageHeader eyebrow="PLACEMENTS" title="Onde a mídia entrega e converte" description="Feed, Stories, Reels, Explore e plataforma vistos por custo, atenção, compra e encaixe com criativo."/>
+ <div className="analysis-highlight-row"><Surface eyebrow="MELHOR RETORNO" title="Placement mais eficiente"><strong className="analysis-big">{best?.key||'—'}</strong><p className="muted-copy">ROAS {num(best?.roas)} · CAC {money(best?.cac)} · gasto {money(best?.spend)}</p></Surface><Surface eyebrow="MAIOR CAC" title="Ponto para investigar"><strong className="analysis-big">{costly?.key||'—'}</strong><p className="muted-copy">CAC {money(costly?.cac)} · CTR {pct(costly?.ctr)}</p></Surface><Surface eyebrow="COBERTURA" title="Combinações com entrega"><strong className="analysis-big">{integer(agg.length)}</strong><p className="muted-copy">Placements agregados com dados disponíveis.</p></Surface></div>
+ <SectionHeader number="01" eyebrow="DISTRIBUIÇÃO" title="Onde a verba está indo" description="Concentração de gasto e retorno por placement para identificar dependência ou espaço para testes."/>
+ <div className="deep-two"><HorizontalBars title="Gasto por placement" rows={agg} valueKey="spend" formatValue={money}/><HorizontalBars title="ROAS por placement" rows={agg.filter(x=>x.spend>=20)} valueKey="roas" formatValue={num}/></div>
+ <SectionHeader number="02" eyebrow="DETALHE" title="Eficiência por placement" description="Leitura completa de gasto, atenção e fundo de funil."/>
+ <Surface><DataTable rows={agg} columns={[{key:'key',label:'Placement'},{key:'spend',label:'Gasto',render:r=>money(r.spend)},{key:'ctr',label:'CTR',render:r=>pct(r.ctr)},{key:'cpc',label:'CPC',render:r=>money(r.cpc)},{key:'purchases',label:'Compras',render:r=>integer(r.purchases)},{key:'cac',label:'CAC',render:r=>money(r.cac)},{key:'roas',label:'ROAS',render:r=>num(r.roas)}]}/></Surface>
+ <SectionHeader number="03" eyebrow="PEÇA × CONTEXTO" title="Criativos que mudam de performance por placement" description="A média do placement pode esconder um criativo muito bom ou muito ruim naquele contexto."/>
+ <Surface><DataTable rows={rows.slice().sort((a,b)=>n(b.spend)-n(a.spend)).slice(0,80)} columns={[{key:'creative_name',label:'Criativo'},{key:'publisher_platform',label:'Plataforma'},{key:'platform_position',label:'Posição'},{key:'spend',label:'Gasto',render:r=>money(r.spend)},{key:'ctr',label:'CTR',render:r=>pct(r.ctr)},{key:'purchases',label:'Compras',render:r=>integer(r.purchases)},{key:'cac',label:'CAC',render:r=>money(r.cac)},{key:'roas',label:'ROAS',render:r=>num(r.roas)}]}/></Surface></div>
+}
