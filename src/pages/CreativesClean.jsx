@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { HorizontalBars, RetentionChart } from '../components/Charts.jsx'
 import { Badge, DataTable, MiniMetric, PageHeader, Surface } from '../components/UI.jsx'
-import { integer, money, num, pct } from '../lib/format.js'
+import { cleanAdName, integer, money, num, pct } from '../lib/format.js'
 import { loadVideoInsight } from '../api.js'
 
 const n=v=>Number(v||0)
@@ -23,8 +23,8 @@ function Metric({label,value,helper}){
 }
 
 function diagnose(item, benchmark){
-  const m=item?.metrics||{}, ctr=n(m.ctr), roas=n(m.roas), purchases=n(m.purchases), spend=n(m.spend)
-  if(item?.state?.key==='winner') return {title:'Peça com sinal de escala',text:`A peça combina compras e retorno acima do limiar atual. O próximo passo é validar se o resultado se mantém ao ampliar entrega sem deteriorar CTR e CAC.`}
+  const m=item?.metrics||{}, ctr=n(m.ctr), spend=n(m.spend)
+  if(item?.state?.key==='winner') return {title:'Peça com sinal de escala',text:'A peça combina compras e retorno acima do limiar atual. O próximo passo é validar se o resultado se mantém ao ampliar entrega sem deteriorar CTR e CAC.'}
   if(item?.state?.key==='promising') return {title:'Sinal positivo, ainda sem volume',text:'Já existe compra atribuída, mas a amostra ainda é pequena. Vale preservar a peça e ganhar evidência antes de classificá-la como vencedora.'}
   if(item?.state?.key==='attention') return {title:'O problema começa na atenção',text:`CTR de ${pct(ctr)} está abaixo do benchmark da conta (${pct(benchmark)}). Antes de mexer em público ou página, vale revisar hook, primeiro frame e proposta visual.`}
   if(item?.state?.key==='postclick') return {title:'A atenção existe; a conversão não acompanha',text:`A peça já consumiu ${money(spend)} sem compra atribuída relevante. O criativo pode estar gerando clique sem expectativa alinhada à página ou à oferta.`}
@@ -40,6 +40,18 @@ export default function CreativesClean({ data }) {
   const [video, setVideo] = useState(null)
   const [videoLoading, setVideoLoading] = useState(false)
   const [videoError, setVideoError] = useState('')
+
+  useEffect(()=>{
+    if(!selected) return
+    const bodyOverflow=document.body.style.overflow
+    const htmlOverflow=document.documentElement.style.overflow
+    document.body.style.overflow='hidden'
+    document.documentElement.style.overflow='hidden'
+    return ()=>{
+      document.body.style.overflow=bodyOverflow
+      document.documentElement.style.overflow=htmlOverflow
+    }
+  },[selected])
 
   const enriched = useMemo(() => profiles.map(p => ({ ...p, state: creativeState(p, benchmark) })), [profiles, benchmark])
   const visible = enriched.filter(x => filter === 'all' || x.state.key === filter)
@@ -90,7 +102,7 @@ export default function CreativesClean({ data }) {
 
     <div className="pro-creative-grid">{visible.map(item => <article className="pro-creative-card" key={item.id} onClick={() => openCreative(item)}>
       <div className="pro-creative-media">{item.image_url || item.thumbnail_url ? <img src={item.image_url || item.thumbnail_url} alt="" loading="lazy" /> : <div>SKIN</div>}<Badge tone={item.state.tone}>{item.state.label}</Badge></div>
-      <div className="pro-creative-body"><h3>{item.name || 'Criativo'}</h3><p>{item.headline || item.primary_text || item.hook || 'Sem headline estruturada.'}</p><div>
+      <div className="pro-creative-body"><h3>{cleanAdName(item.name,'Criativo')}</h3><p>{item.headline || item.primary_text || item.hook || 'Sem headline estruturada.'}</p><div>
         <span><small>Gasto</small><strong>{money(item.metrics?.spend)}</strong></span>
         <span><small>ROAS</small><strong>{num(item.metrics?.roas)}</strong></span>
         <span><small>CTR</small><strong>{pct(item.metrics?.ctr)}</strong></span>
@@ -100,13 +112,13 @@ export default function CreativesClean({ data }) {
 
     {selected && <div className="creative-detail-backdrop" onMouseDown={e => e.target === e.currentTarget && setSelected(null)}>
       <section className="creative-detail-shell">
-        <header className="creative-detail-topbar"><div><span>ANÁLISE DO CRIATIVO</span><strong>{selected.name||'Criativo'}</strong></div><button onClick={()=>setSelected(null)}>Fechar ×</button></header>
+        <header className="creative-detail-topbar"><div><span>ANÁLISE DO CRIATIVO</span><strong>{cleanAdName(selected.name,'Criativo')}</strong></div><button onClick={()=>setSelected(null)}>Fechar ×</button></header>
 
         <div className="creative-detail-hero">
           <div className="creative-detail-media">{selected.image_url||selected.thumbnail_url?<img src={selected.image_url||selected.thumbnail_url} alt=""/>:<div className="creative-detail-placeholder">SKIN</div>}</div>
           <div className="creative-detail-summary">
             <div className="creative-detail-status"><Badge tone={selected.state.tone}>{selected.state.label}</Badge><span>{text(selected.format||selected.media_type||selected.type,'Peça de mídia')}</span></div>
-            <h2>{selected.headline||selected.name||'Criativo'}</h2>
+            <h2>{selected.headline||cleanAdName(selected.name,'Criativo')}</h2>
             <p>{selected.primary_text||selected.hook||'Sem texto principal estruturado para esta peça.'}</p>
             <div className="creative-detail-diagnosis"><span>LEITURA</span><strong>{diagnosis.title}</strong><p>{diagnosis.text}</p></div>
             <div className="creative-detail-scoreline"><Metric label="Gasto" value={money(selectedMetrics.spend)}/><Metric label="Compras" value={integer(selectedPurchases)}/><Metric label="ROAS" value={num(selectedRoas)}/><Metric label="CAC" value={money(selectedCac)}/></div>
