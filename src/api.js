@@ -3,6 +3,7 @@ const SESSION_KEY = 'skin_tm_session'
 
 export const endpoints = {
   login: `${SUPABASE_URL}/functions/v1/traffic-manager-login`,
+  secure: `${SUPABASE_URL}/functions/v1/traffic-manager-secure-api`,
   bootstrap: `${SUPABASE_URL}/functions/v1/traffic-manager-secure-api?action=bootstrap&days=30`,
   manager: `${SUPABASE_URL}/functions/v1/traffic-manager-continuous-api`,
   shopify: `${SUPABASE_URL}/functions/v1/traffic-shopify-secure-api`,
@@ -33,7 +34,10 @@ export async function api(url, init = {}) {
   const text = await response.text()
   let data = null
   try { data = text ? JSON.parse(text) : null } catch { data = text }
-  if (!response.ok) throw new Error(typeof data === 'string' ? data : data?.error || `HTTP ${response.status}`)
+  if (!response.ok) {
+    if (response.status === 401) clearSession()
+    throw new Error(typeof data === 'string' ? data : data?.error || `HTTP ${response.status}`)
+  }
   return data
 }
 
@@ -43,7 +47,12 @@ async function optional(url) {
 
 export async function loadCoreData() {
   const [bootstrap, shopify, funnel, manager, audience, video] = await Promise.all([
-    api(endpoints.bootstrap), api(endpoints.shopify), api(endpoints.funnel), api(endpoints.manager), optional(endpoints.audience), optional(endpoints.video),
+    api(endpoints.bootstrap),
+    api(endpoints.shopify),
+    api(endpoints.funnel),
+    api(endpoints.manager),
+    optional(endpoints.audience),
+    optional(endpoints.video),
   ])
   return { bootstrap, shopify, funnel, manager, audience, video }
 }
