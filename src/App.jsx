@@ -4,6 +4,7 @@ import Shell from './components/Shell.jsx'
 import DiagnosticModal from './components/DiagnosticModal.jsx'
 import ApprovalsPage from './pages/ApprovalsPage.jsx'
 import ExecutiveClean from './pages/ExecutiveClean.jsx'
+import ActionCenter from './pages/ActionCenter.jsx'
 import CreativesClean from './pages/CreativesClean.jsx'
 import IntegrationsClean from './pages/IntegrationsClean.jsx'
 import StrategyPage from './pages/StrategyPage.jsx'
@@ -15,10 +16,10 @@ import EntityDeep from './pages/EntityDeep.jsx'
 import WasteDeep from './pages/WasteDeep.jsx'
 import { api, clearSession, endpoints, getSession, loadCoreData } from './api.js'
 
-const validTabs = new Set(['strategy','manager','executive','approvals','analysis','creatives','audiences','placements','campaigns','sets','ads','waste','integrations'])
+const validTabs = new Set(['actions','strategy','manager','executive','approvals','analysis','creatives','audiences','placements','campaigns','sets','ads','waste','integrations'])
 const hashTab = () => {
   const key = String(window.location.hash || '').replace(/^#\/?/, '')
-  return validTabs.has(key) ? key : 'strategy'
+  return validTabs.has(key) ? key : 'actions'
 }
 
 export default function App() {
@@ -80,6 +81,7 @@ export default function App() {
   }
 
   const page = {
+    actions: <ActionCenter data={data} onNavigate={navigate} onRefresh={refresh} isLoading={loading} />,
     strategy: <StrategyPage data={data} onGoManager={() => navigate('manager')} />,
     manager: <ManagerDeep data={data} onOpen={setDiagnosticId} onRefresh={runManager} />,
     approvals: <ApprovalsPage data={data} onOpen={setDiagnosticId} onRefresh={refresh} />,
