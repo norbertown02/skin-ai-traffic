@@ -81,7 +81,7 @@ export default function App() {
   }
 
   const page = {
-    actions: <ActionCenter data={data} onNavigate={navigate} onRefresh={refresh} isLoading={loading} />,
+    actions: <ActionCenter data={data} onNavigate={navigate} onRefresh={runManager} isLoading={loading} />,
     strategy: <StrategyPage data={data} onGoManager={() => navigate('manager')} />,
     manager: <ManagerDeep data={data} onOpen={setDiagnosticId} onRefresh={runManager} />,
     approvals: <ApprovalsPage data={data} onOpen={setDiagnosticId} onRefresh={refresh} />,
