@@ -11,13 +11,13 @@ const primary = [
 const secondary = [
   ['manager','Diagnóstico completo','DG'],['strategy','Metas e limites','MT'],
   ['executive','Relatório gerencial','RG'],['approvals','Aprovações','AP'],
-  ['analysis','Análise aprofundada','AN'],['placements','Posicionamentos','PL'],
+  ['analysis','Análise detalhada','AN'],['placements','Posicionamentos','PL'],
   ['sets','Conjuntos','CJ'],['ads','Anúncios','AD'],
   ['waste','Desperdícios','DP'],['integrations','Integrações','IN']
 ]
 
 export default function Shell({tab,onTab,data,onLogout,children}) {
-  const [advanced, setAdvanced] = useState(false)
+  const [advanced, setAdvanced] = useState(true)
   const lastMeta = sourceDate(data)
   const shopMonth = data?.shopify?.business?.at?.(-1)?.month_start
   return <div className="app-shell">
