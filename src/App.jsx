@@ -87,7 +87,7 @@ export default function App() {
     approvals: <ApprovalsPage data={data} onOpen={setDiagnosticId} onRefresh={refresh} />,
     analysis: <AnalysisDeep data={data} />,
     creatives: <CreativesClean data={data} />,
-    audiences: <AudienceDeep data={data} />,
+    audiences: <AudienceDeep data={data} onNavigate={navigate} />,
     placements: <PlacementDeep data={data} />,
     campaigns: <EntityDeep data={data} type="campaign" />,
     sets: <EntityDeep data={data} type="ad_set" />,
