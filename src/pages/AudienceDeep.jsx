@@ -7,7 +7,7 @@ import { classifyFunnelContext, stageLabel } from '../lib/funnelContext.js'
 const n=v=>Number(v||0)
 const sort=(r,k='spend')=>(r||[]).slice().sort((a,b)=>n(b[k])-n(a[k]))
 function Metric({label,value,note}){return <div className="deep-metric"><span>{label}</span><strong>{value}</strong>{note&&<small>{note}</small>}</div>}
-export default function AudienceDeep({data}){
+export default function AudienceDeep({data,onNavigate}){
  const [range,setRange]=useState('30')
  const [year,setYear]=useState(String(new Date().getFullYear()))
  const [start,setStart]=useState('')
@@ -48,6 +48,7 @@ export default function AudienceDeep({data}){
  const bestAge=sort((a.by_age||[]).filter(x=>n(x.spend)>0),'roas')[0], bestGender=sort((a.by_gender||[]).filter(x=>n(x.spend)>0),'roas')[0], topType=sort(types.filter(x=>n(x.spend)>0),'roas')[0]
  const stageSpend=['top','middle','bottom','customer','mixed','unknown'].map(key=>({key:stageLabel(key),spend:rows.filter(x=>x._funnel.stage===key).reduce((s,x)=>s+n(x.spend),0)})).filter(x=>x.spend>0)
  return <div className="page deep-page"><PageHeader eyebrow="PÚBLICOS" title="Inteligência de audiência" description="A audiência é a principal fonte da classificação de Topo, Meio e Fundo. O criativo mantém sua função de mensagem; o funil vem do contexto de entrega."/>
+ <div style={{display:"flex",justifyContent:"flex-end",paddingTop:8}}><button className="btn primary" type="button" onClick={()=>onNavigate?.("analysis")}>Abrir análise detalhada →</button></div>
  <div className="analysis-period-filter" style={{display:'flex',alignItems:'end',gap:12,flexWrap:'wrap',padding:'16px 0'}}>
   <label>Período <select value={range} onChange={e=>setRange(e.target.value)}><option value="7">Últimos 7 dias</option><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option><option value="180">Últimos 6 meses</option><option value="year">Ano inteiro</option><option value="custom">Personalizado</option></select></label>
   {range==='year'&&<label>Ano <select value={year} onChange={e=>setYear(e.target.value)}>{Array.from({length:5},(_,i)=>currentYear-i).map(y=><option value={y} key={y}>{y}</option>)}</select></label>}
