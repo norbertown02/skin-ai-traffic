@@ -1,6 +1,27 @@
 import React, { useState } from 'react'
 import { login, sendAccessLink } from '../api.js'
 
+function loginError(error, mode) {
+  switch (error?.code) {
+    case 'over_email_send_rate_limit':
+      return 'O limite de envio de e-mails foi atingido. Aguarde até uma hora antes de solicitar um novo link.'
+    case 'over_request_rate_limit':
+      return 'Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente de novo.'
+    case 'invalid_credentials':
+      return 'E-mail ou senha inválidos.'
+    case 'otp_expired':
+      return 'O link expirou ou já foi usado. Solicite um novo link.'
+    case 'otp_disabled':
+    case 'user_not_found':
+      return 'Confira o e-mail autorizado para acessar o relatório.'
+    default:
+      if (error?.message?.includes('configurada')) return error.message
+      return mode === 'link'
+        ? 'Não foi possível enviar o link agora. Tente novamente em instantes.'
+        : 'Não foi possível entrar agora. Tente novamente em instantes.'
+  }
+}
+
 export default function Login({ onSuccess }) {
   const [email, setEmail] = useState('')
   const [mode, setMode] = useState('link')
@@ -21,7 +42,7 @@ export default function Login({ onSuccess }) {
         setNotice('Confira seu e-mail para abrir o link de acesso.')
       }
     } catch (error) {
-      setError(error.message.includes('configurada') ? error.message : 'Não foi possível entrar. Confira se o e-mail tem acesso ao relatório.')
+      setError(loginError(error, mode))
     }
     finally { setLoading(false) }
   }
