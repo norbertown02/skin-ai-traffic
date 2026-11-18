@@ -3,7 +3,7 @@ import { HorizontalBars, RetentionChart } from '../components/Charts.jsx'
 import { Badge, DataTable, MiniMetric, PageHeader, Surface } from '../components/UI.jsx'
 import { cleanCreativeName, integer, money, num, pct } from '../lib/format.js'
 import { classifyFunnelContext, stageLabel, summarizeContexts } from '../lib/funnelContext.js'
-import { loadVideoInsight } from '../api.js'
+import { videoSummary } from '../../supabase/functions/traffic-report/report.mjs'
 
 const n=v=>Number(v||0)
 const rate=(a,b)=>n(b)?n(a)/n(b)*100:0
@@ -72,7 +72,6 @@ export default function CreativesClean({ data }) {
   const [selected,setSelected]=useState(null)
   const [detailTab,setDetailTab]=useState('overview')
   const [video,setVideo]=useState(null)
-  const [videoLoading,setVideoLoading]=useState(false)
   const [videoError,setVideoError]=useState('')
   const [messageMap,setMessageMap]=useState(loadMessageMap)
   const [draft,setDraft]=useState(null)
@@ -95,11 +94,11 @@ export default function CreativesClean({ data }) {
   const visible=enriched.filter(x=>(filter==='all'||x.state.key===filter)&&(roleFilter==='all'||x.message.role===roleFilter))
   const selectedLive=selected?enriched.find(x=>String(x.id)===String(selected.id))||selected:null
 
-  async function openCreative(item){
-    setSelected(item);setDraft({...item.message});setDetailTab('overview');setVideo(null);setVideoError('');setVideoLoading(true)
-    try{const result=await loadVideoInsight(item.id);setVideo(result?.available?result:null);if(!result?.available)setVideoError(result?.is_video===false?'Este criativo não é vídeo.':'A Meta não retornou retenção disponível para este criativo.')}
-    catch{setVideoError('Retenção de vídeo indisponível no momento. Os demais dados continuam válidos.')}
-    finally{setVideoLoading(false)}
+  function openCreative(item){
+    setSelected(item);setDraft({...item.message});setDetailTab('overview')
+    const result = videoSummary(item)
+    setVideo(result.available ? result : null)
+    setVideoError(result.is_video ? 'A Meta ainda não retornou retenção para este criativo.' : 'Este criativo não é vídeo.')
   }
 
   function saveCreativeMessage(){
@@ -172,7 +171,7 @@ export default function CreativesClean({ data }) {
 
         {detailTab==='strategy'&&<div className="creative-strategy-editor"><Surface eyebrow="CRIATIVO" title="Classificação da mensagem"><p className="muted-copy">Aqui classificamos somente o que a peça comunica. O estágio do funil não é editado no criativo.</p><div className="creative-strategy-form"><StrategySelect label="Função da mensagem" value={draft?.role||'attention'} onChange={v=>setDraft(d=>({...d,role:v}))} options={roles}/><StrategySelect label="Conceito" value={draft?.concept||'product'} onChange={v=>setDraft(d=>({...d,concept:v}))} options={concepts}/></div><div className="strategy-editor-actions"><button className="btn primary" onClick={saveCreativeMessage}>Salvar classificação</button><button className="btn" onClick={resetCreativeMessage}>Usar sugestão automática</button></div></Surface><Surface eyebrow="MÍDIA" title="Contexto de funil detectado"><div className="creative-observed-read"><div><span>Contexto dominante</span><strong>{stageLabel(context.dominant)}</strong></div><div><span>Conjuntos mapeados</span><strong>{integer(context.total)}</strong></div><p>Topo {integer(context.count.top)} · Meio {integer(context.count.middle)} · Fundo {integer(context.count.bottom)} · Clientes {integer(context.count.customer)} · Misto {integer(context.count.mixed)}</p><small>Essa classificação vem do nome/tipo de audiência e do contexto disponível do conjunto. Quando o targeting não está exposto pela API, marcamos como “Não classificado” em vez de inventar precisão.</small></div></Surface></div>}
 
-        {detailTab==='video'&&<Surface eyebrow="VÍDEO" title="Retenção e consumo"><div>{videoLoading?<p className="muted-copy">Consultando retenção deste criativo…</p>:video?<><div className="mini-metric-grid four"><MiniMetric label="Plays" value={integer(video.plays)}/><MiniMetric label="Play rate" value={pct(video.play_rate_pct)}/><MiniMetric label="Tempo médio" value={`${num(video.avg_watch_seconds,1)}s`}/><MiniMetric label="ThruPlay" value={pct(video.thruplay_rate_pct)}/></div><div className="creative-retention-wrap"><RetentionChart retention={video.retention_pct} height={300}/></div></>:<div className="creative-empty-state"><strong>Retenção indisponível</strong><p>{videoError||'A Meta não retornou dados de retenção para essa peça.'}</p></div>}</div></Surface>}
+        {detailTab==='video'&&<Surface eyebrow="VÍDEO" title="Retenção e consumo"><div>{video?<><div className="mini-metric-grid four"><MiniMetric label="Plays" value={integer(video.plays)}/><MiniMetric label="Play rate" value={pct(video.play_rate_pct)}/></div><div className="creative-retention-wrap"><RetentionChart retention={video.retention_pct} height={300}/></div></>:<div className="creative-empty-state"><strong>Retenção indisponível</strong><p>{videoError||'A Meta não retornou dados de retenção para essa peça.'}</p></div>}</div></Surface>}
 
         {detailTab==='audience'&&<div className="creative-detail-grid-two"><HorizontalBars title="Gasto por conjunto" subtitle="Onde a peça recebeu investimento" rows={audienceRows.map((x,i)=>({key:x.ad_set_name||x.audience_type||`Público ${i+1}`,spend:n(x.spend)}))} valueKey="spend" formatValue={money}/><Surface eyebrow="DETALHE" title="Contexto por conjunto"><DataTable compact rows={audienceRows.slice(0,30)} columns={[{key:'ad_set_name',label:'Conjunto'},{key:'_funnel',label:'Funil',render:r=>stageLabel(r._funnel.stage)},{key:'audience_type',label:'Público'},{key:'spend',label:'Gasto',render:r=>money(r.spend)},{key:'purchases',label:'Compras',render:r=>integer(r.purchases)},{key:'cac',label:'CAC',render:r=>money(r.cac)},{key:'roas',label:'ROAS',render:r=>num(r.roas)}]}/></Surface></div>}
         {detailTab==='placements'&&<div className="creative-detail-grid-two"><HorizontalBars title="Gasto por placement" subtitle="Distribuição da peça" rows={placementRows.map((x,i)=>({key:`${x.publisher_platform||'—'} · ${x.platform_position||`Posição ${i+1}`}`,spend:n(x.spend)}))} valueKey="spend" formatValue={money}/><Surface eyebrow="DETALHE" title="Performance por placement"><DataTable compact rows={placementRows.slice(0,20)} columns={[{key:'publisher_platform',label:'Plataforma'},{key:'platform_position',label:'Posição'},{key:'spend',label:'Gasto',render:r=>money(r.spend)},{key:'purchases',label:'Compras',render:r=>integer(r.purchases)},{key:'cac',label:'CAC',render:r=>money(r.cac)},{key:'roas',label:'ROAS',render:r=>num(r.roas)}]}/></Surface></div>}

@@ -150,7 +150,7 @@ export function deriveRecommendations(data, goals = {}) {
   if (!output.campaigns.length && eligibleCampaigns.length) {
     add(action('campaigns', 'inspect', 'baseline', 'info',
       'Comparar retorno das campanhas antes de redistribuir verba',
-      integer(eligibleCampaigns.length) + ' campanhas com investimento no período; ' + integer(totalShopOrders) + ' pedidos Shopify no mês ' + (shop.month_start ? monthLabel(shop.month_start) : 'mais recente') + '.',
+      integer(eligibleCampaigns.length) + ' campanhas com investimento no período.' + (shop.has_shopify ? ' ' + integer(totalShopOrders) + ' pedidos Shopify em ' + monthLabel(shop.month_start) + '.' : ''),
       'Abrir campanhas e identificar quais concentram gasto e compras. Definir CAC máximo para liberar recomendações de escala e corte.',
       'Analisar CAC e MER com datas e atribuições compatíveis.',
       'Sem guardrail econômico configurado'))
@@ -198,8 +198,8 @@ export default function ActionCenter({ data, onNavigate, onRefresh, isLoading })
   const recent = sourceDate(data)
   const orders = value(business?.shopify_orders)
   const media = value(business?.meta_spend)
-  const hasCommercialData = Boolean(business?.month_start)
-  const period = business?.month_start ? monthLabel(business.month_start) : 'Indisponível'
+  const hasCommercialData = Boolean(business?.has_shopify)
+  const period = hasCommercialData ? monthLabel(business.month_start) : 'Indisponível'
 
   function toggle(id) {
     setReviewed(prev => {
@@ -220,9 +220,9 @@ export default function ActionCenter({ data, onNavigate, onRefresh, isLoading })
       <div className="ac-focus-main"><span>LEITURA PRIORITÁRIA</span><h2>{primary?.title || 'Aguardando métricas confiáveis'}</h2><p>{primary?.evidence || 'Sem leitura disponível no momento.'}</p><strong>Próximo passo</strong><p>{primary?.next || 'Revisar as integrações de dados.'}</p></div>
       <div className="ac-focus-aside">
         <div><span>RECEITA / SHOPIFY</span><strong>{hasCommercialData ? money(business.shopify_revenue) : '—'}</strong></div>
-        <div><span>INVESTIMENTO / META</span><strong>{hasCommercialData ? money(media) : '—'}</strong></div>
+        <div><span>INVESTIMENTO / META</span><strong>{business?.meta_spend != null ? money(media) : '—'}</strong></div>
         <div><span>PEDIDOS / SHOPIFY</span><strong>{hasCommercialData ? integer(orders) : '—'}</strong></div>
-        <div className="ac-focus-foot"><span>MER do mês</span><strong>{hasCommercialData && media > 0 ? num(value(business.mer)) : '—'}</strong></div>
+        <div className="ac-focus-foot"><span>MER do mês</span><strong>{business?.mer != null ? num(value(business.mer)) : '—'}</strong></div>
       </div>
     </section>
     <div className="ac-note">Os números do resumo são do mês comercial informado acima. As recomendações operacionais analisam o recorte disponível na Meta. Compras atribuídas pela Meta e pedidos Shopify não são a mesma métrica.</div>

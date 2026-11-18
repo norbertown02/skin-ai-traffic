@@ -6,6 +6,7 @@ const n=v=>Number(v||0)
 function Metric({label,value,note}){return <div className="deep-metric"><span>{label}</span><strong>{value}</strong>{note&&<small>{note}</small>}</div>}
 export default function WasteDeep({data}){
  const w=data?.deep?.waste||{}, items=w.items||[]
+ if(w.available===false) return <div className="page deep-page"><PageHeader eyebrow="DESPERDÍCIOS" title="Diagnóstico de perda de eficiência"/><Surface><p>As estimativas de desperdício ainda não estão disponíveis nesta base.</p></Surface></div>
  const itemName=(x,i)=>x.creative_name?cleanAdName(x.creative_name,'Criativo'):x.ad_name?cleanAdName(x.ad_name):x.type||`Item ${i+1}`
  return <div className="page deep-page"><PageHeader eyebrow="DESPERDÍCIOS" title="Diagnóstico de perda de eficiência" description="Organiza sinais de gasto improdutivo por causa provável. Exposição potencial é ponto de investigação, não ordem automática de corte."/>
  <div className="deep-metric-grid five"><Metric label="Exposição potencial" value={money(w?.summary?.estimated_total)}/><Metric label="Público" value={integer(w?.summary?.counts?.audience_mismatch)}/><Metric label="Placement" value={integer(w?.summary?.counts?.placement_mismatch)}/><Metric label="Atenção" value={integer(w?.summary?.counts?.attention)}/><Metric label="Pós-clique" value={integer(w?.summary?.counts?.post_click)}/></div>

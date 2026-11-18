@@ -3,7 +3,7 @@ import { PageHeader, Surface, Badge } from '../components/UI.jsx'
 import { monthLabel, sourceDate } from '../lib/format.js'
 
 export default function IntegrationsClean({ data }) {
-  const business = data?.shopify?.business || []
+  const business = (data?.shopify?.business || []).filter(row => row.has_shopify)
   const latestBusiness = business.at(-1)
   const metaDate = sourceDate(data)
   const quality = data?.manager?.quality || []

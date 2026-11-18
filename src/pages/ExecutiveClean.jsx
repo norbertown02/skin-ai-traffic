@@ -52,13 +52,15 @@ export default function ExecutiveClean({data,onBack}){
   const [trendView,setTrendView]=useState('business')
   const [mediaView,setMediaView]=useState('cost')
 
+  const fmap=useMemo(()=>new Map(funnels.map(x=>[x.month_start,x])),[funnels])
   const current=business.find(x=>x.month_start===selected)||business.at(-1)
   if(!current)return <div className="sx-empty">Sem dados consolidados para o relatório.</div>
 
   const idx=business.findIndex(x=>x.month_start===current.month_start)
   const previous=idx>0?business[idx-1]:null
-  const fmap=useMemo(()=>new Map(funnels.map(x=>[x.month_start,x])),[funnels])
   const fm=fmap.get(current.month_start)||{}, pf=previous?fmap.get(previous.month_start)||{}:{}
+  const commercial=current.has_shopify
+  const available=(formatted)=>commercial?formatted:'—'
   const labels=business.map(x=>shortMonth(x.month_start))
 
   const revenue=safe(current.shopify_revenue), orders=safe(current.shopify_orders), spend=safe(current.meta_spend), sessions=safe(current.sessions)
@@ -74,10 +76,10 @@ export default function ExecutiveClean({data,onBack}){
   const shopRows=[{label:'Sessões',value:current.sessions},{label:'Carrinhos',value:current.cart_additions},{label:'Checkout',value:current.reached_checkout},{label:'Compras',value:current.completed_checkout||current.shopify_orders}]
 
   const businessDatasets = trendView==='business' ? [
-    {label:'Receita',data:business.map(x=>safe(x.shopify_revenue)),borderColor:purple,backgroundColor:'rgba(75,40,92,.09)',fill:true,tension:.38,borderWidth:2.5,pointRadius:2.5,pointHoverRadius:6},
+    {label:'Receita Shopify',data:business.map(x=>x.has_shopify?x.shopify_revenue:null),borderColor:purple,backgroundColor:'rgba(75,40,92,.09)',fill:true,tension:.38,borderWidth:2.5,pointRadius:2.5,pointHoverRadius:6},
     {label:'Investimento',data:business.map(x=>safe(x.meta_spend)),borderColor:lilac,backgroundColor:'transparent',tension:.38,borderWidth:2,pointRadius:2,pointHoverRadius:5}
   ] : [
-    {label:'MER',data:business.map(x=>safe(x.mer)),borderColor:purple,backgroundColor:'rgba(75,40,92,.08)',fill:true,tension:.38,borderWidth:2.5,pointRadius:2.5,pointHoverRadius:6},
+    {label:'MER',data:business.map(x=>x.mer??null),borderColor:purple,backgroundColor:'rgba(75,40,92,.08)',fill:true,tension:.38,borderWidth:2.5,pointRadius:2.5,pointHoverRadius:6},
     {label:'ROAS Meta',data:business.map(x=>safe(x.meta_roas)),borderColor:mauve,backgroundColor:'transparent',tension:.38,borderWidth:2,pointRadius:2,pointHoverRadius:5}
   ]
 
@@ -93,27 +95,29 @@ export default function ExecutiveClean({data,onBack}){
     <button className="sx-back" onClick={onBack}>← Painel</button>
 
     <section className="sx-hero">
-      <div className="sx-hero-copy"><span>RELATÓRIO GERENCIAL</span><h1>Performance da operação</h1><p>Shopify como verdade comercial. Meta como leitura de mídia, atribuição e eficiência.</p></div>
-      <div className="sx-hero-side"><label><span>PERÍODO</span><select value={current.month_start} onChange={e=>setSelected(e.target.value)}>{business.slice().reverse().map(x=><option key={x.month_start} value={x.month_start}>{monthLabel(x.month_start)}</option>)}</select></label><div className="sx-hero-revenue"><small>Receita</small><strong>{money(revenue)}</strong><p>{integer(orders)} pedidos · ticket {money(ticket)}</p></div></div>
+      <div className="sx-hero-copy"><span>RELATÓRIO GERENCIAL</span><h1>Performance da operação</h1><p>Mídia, atribuição e desempenho comercial por mês.</p></div>
+      <div className="sx-hero-side"><label><span>PERÍODO</span><select value={current.month_start} onChange={e=>setSelected(e.target.value)}>{business.slice().reverse().map(x=><option key={x.month_start} value={x.month_start}>{monthLabel(x.month_start)}</option>)}</select></label><div className="sx-hero-revenue"><small>{commercial?'Receita Shopify':'Receita atribuída pelo Meta'}</small><strong>{money(commercial?revenue:current.meta_revenue)}</strong><p>{commercial?`${integer(orders)} pedidos · ticket ${money(ticket)}`:`${integer(current.meta_purchases)} compras atribuídas`}</p></div></div>
     </section>
 
     <section className="sx-page sx-summary">
+      {current.meta_through_date&&<p>Dados de mídia até {current.meta_through_date.split('-').reverse().join('/')}.</p>}
+      {!commercial&&<p role="status">Os dados comerciais do Shopify estão indisponíveis para este mês.</p>}
       <SectionTitle eyebrow="VISÃO DO MÊS" title="O que importa agora" text="Uma leitura executiva com negócio, eficiência e qualidade do tráfego no mesmo contexto."/>
       <div className="sx-kpi-grid">
-        <KPI label="Receita" value={money(revenue)} change={revenueDelta} tone="hero" sub="Shopify"/>
-        <KPI label="Pedidos" value={integer(orders)} change={ordersDelta} sub={`Ticket ${money(ticket)}`}/>
+        <KPI label="Receita" value={available(money(revenue))} change={commercial?revenueDelta:null} tone="hero" sub="Shopify"/>
+        <KPI label="Pedidos" value={available(integer(orders))} change={commercial?ordersDelta:null} sub={commercial?`Ticket ${money(ticket)}`:undefined}/>
         <KPI label="Investimento" value={money(spend)} change={spendDelta} inverse sub="Meta Ads"/>
-        <KPI label="CAC blended" value={money(cac)} change={cacDelta} inverse/>
-        <KPI label="MER" value={num(current.mer)} change={merDelta}/>
+        <KPI label="CAC blended" value={available(money(cac))} change={commercial?cacDelta:null} inverse/>
+        <KPI label="MER" value={available(num(current.mer))} change={commercial?merDelta:null}/>
         <KPI label="ROAS Meta" value={num(current.meta_roas)} change={d(current.meta_roas,previous?.meta_roas)}/>
-        <KPI label="Conversão" value={pct(cvr)} change={cvrDelta}/>
-        <KPI label="Sessões" value={integer(sessions)} change={d(sessions,previous?.sessions)}/>
+        <KPI label="Conversão" value={available(pct(cvr))} change={commercial?cvrDelta:null}/>
+        <KPI label="Sessões" value={available(integer(sessions))} change={commercial?d(sessions,previous?.sessions):null}/>
       </div>
 
       <div className="sx-signal-grid">
         <article><span>GARGALO PRINCIPAL</span><strong>{weakest?.[0]||'Sem gargalo confiável'}</strong><p>{weakest?`Taxa de passagem de ${pct(weakest[1])}.`:'Ainda faltam eventos suficientes para leitura segura.'}</p></article>
         <article><span>QUALIDADE DE MÍDIA</span><strong>CTR {pct(fm.ctr)}</strong><p>CPM {money(fm.cpm)} · CPC {money(fm.cpc)} · frequência {num(fm.frequency)}</p></article>
-        <article><span>EFICIÊNCIA COMERCIAL</span><strong>{num(current.mer)} MER</strong><p>{money(cac)} por pedido real · conversão {pct(cvr)}</p></article>
+        <article><span>EFICIÊNCIA COMERCIAL</span><strong>{commercial?`${num(current.mer)} MER`:'Shopify indisponível'}</strong><p>{commercial?`${money(cac)} por pedido real · conversão ${pct(cvr)}`:'Os indicadores de mídia estão disponíveis para o período.'}</p></article>
       </div>
     </section>
 
@@ -121,16 +125,16 @@ export default function ExecutiveClean({data,onBack}){
       <div className="sx-section-head"><SectionTitle eyebrow="01 · EVOLUÇÃO" title="Negócio em movimento" text="Troque a visão para enxergar escala, investimento e eficiência sem misturar conceitos."/><div className="sx-tabs"><button className={trendView==='business'?'active':''} onClick={()=>setTrendView('business')}>Receita × mídia</button><button className={trendView==='efficiency'?'active':''} onClick={()=>setTrendView('efficiency')}>MER × ROAS</button></div></div>
       <div className="sx-chart-panel"><InteractiveChart labels={labels} datasets={businessDatasets} height={360} yFormat={trendView==='business'?'money':'number'}/></div>
       <div className="sx-submetrics">
-        <div><span>Receita / sessão</span><strong>{money(sessions?revenue/sessions:0)}</strong></div>
-        <div><span>Ticket médio</span><strong>{money(ticket)}</strong></div>
-        <div><span>CAC blended</span><strong>{money(cac)}</strong></div>
-        <div><span>Conversão site</span><strong>{pct(cvr)}</strong></div>
+        <div><span>Receita / sessão</span><strong>{available(money(sessions?revenue/sessions:0))}</strong></div>
+        <div><span>Ticket médio</span><strong>{available(money(ticket))}</strong></div>
+        <div><span>CAC blended</span><strong>{available(money(cac))}</strong></div>
+        <div><span>Conversão site</span><strong>{available(pct(cvr))}</strong></div>
       </div>
     </section>
 
     <section className="sx-purple-wave">
       <div className="sx-page sx-purple-inner"><SectionTitle eyebrow="02 · FUNIL" title="Do clique à compra" text="Atribuição de mídia e comportamento comercial aparecem lado a lado para mostrar onde a intenção perde força."/>
-        <div className="sx-funnel-grid"><Funnel title="Funil atribuído" subtitle="META ADS" rows={metaRows}/><Funnel title="Funil real" subtitle="SHOPIFY" rows={shopRows}/></div>
+        <div className="sx-funnel-grid"><Funnel title="Funil atribuído" subtitle="META ADS" rows={metaRows}/>{commercial&&<Funnel title="Funil real" subtitle="SHOPIFY" rows={shopRows}/>}</div>
         <div className="sx-rate-ribbon"><div><span>Clique → LPV</span><strong>{pct(fm.click_to_lpv)}</strong></div><div><span>LPV → carrinho</span><strong>{pct(fm.lpv_to_cart)}</strong></div><div><span>Carrinho → checkout</span><strong>{pct(fm.cart_to_checkout)}</strong></div><div><span>Checkout → compra</span><strong>{pct(fm.checkout_to_purchase)}</strong></div></div>
       </div>
     </section>
@@ -143,7 +147,7 @@ export default function ExecutiveClean({data,onBack}){
     <section className="sx-page sx-data-dense">
       <SectionTitle eyebrow="04 · DETALHE" title="Leitura completa do período" text="Mais contexto para gestão, sem esconder os indicadores operacionais que explicam os KPIs principais."/>
       <div className="sx-detail-grid">
-        <div><span>Impressões</span><strong>{integer(fm.impressions)}</strong></div><div><span>Alcance</span><strong>{integer(fm.reach)}</strong></div><div><span>Cliques</span><strong>{integer(fm.clicks||fm.link_clicks)}</strong></div><div><span>Landing page views</span><strong>{integer(fm.landing_page_views)}</strong></div><div><span>Adições ao carrinho</span><strong>{integer(fm.adds_to_cart)}</strong></div><div><span>Checkouts iniciados</span><strong>{integer(fm.initiates_checkout)}</strong></div><div><span>Compras Meta</span><strong>{integer(fm.purchases)}</strong></div><div><span>Compras Shopify</span><strong>{integer(current.completed_checkout||current.shopify_orders)}</strong></div>
+        <div><span>Impressões</span><strong>{integer(fm.impressions)}</strong></div><div><span>Alcance</span><strong>{integer(fm.reach)}</strong></div><div><span>Cliques</span><strong>{integer(fm.clicks||fm.link_clicks)}</strong></div><div><span>Landing page views</span><strong>{integer(fm.landing_page_views)}</strong></div><div><span>Adições ao carrinho</span><strong>{integer(fm.adds_to_cart)}</strong></div><div><span>Checkouts iniciados</span><strong>{integer(fm.initiates_checkout)}</strong></div><div><span>Compras Meta</span><strong>{integer(fm.purchases)}</strong></div><div><span>Compras Shopify</span><strong>{available(integer(current.completed_checkout||current.shopify_orders))}</strong></div>
       </div>
     </section>
   </main>

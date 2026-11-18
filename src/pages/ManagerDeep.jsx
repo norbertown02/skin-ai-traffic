@@ -62,6 +62,7 @@ export default function ManagerDeep({data,onRefresh}){
   const [selectedContext,setSelectedContext]=useState('auto')
 
   const revenue=n(current.shopify_revenue), orders=n(current.shopify_orders), spend=n(current.meta_spend), sessions=n(current.sessions)
+  const commercial=Boolean(current.has_shopify)
   const cac=orders?spend/orders:0, mer=n(current.mer), conversion=n(current.conversion_rate)*100, ticket=orders?revenue/orders:0
   const maxCac=n(strategy.max_cac), minMer=n(strategy.min_mer), budget=n(strategy.media_budget), revenueTarget=n(strategy.revenue_target)
 
@@ -110,12 +111,12 @@ export default function ManagerDeep({data,onRefresh}){
     rows.push({key:'conversion',name:'Conversão',funnel:'Fundo',metric:'Checkout → compra',value:pct(checkoutPurchase),sample:counts.atc>=15&&counts.checkout>=8,issues:conversionIssues,level:counts.atc<15||counts.checkout<8?'insufficient':conversionIssues.length>=2?'critical':conversionIssues.length?'attention':'healthy'})
 
     const moneyIssues=[]
-    if(maxCac&&cac>maxCac) moneyIssues.push(`CAC ${money(cac)} acima do limite ${money(maxCac)}`)
-    if(minMer&&mer<minMer) moneyIssues.push(`MER ${num(mer)} abaixo do mínimo ${num(minMer)}`)
-    if(lowerBad(conversion,prevConv,15)) moneyIssues.push(`conversão Shopify caiu ${num(Math.abs(change(conversion,prevConv)),1)}%`)
-    rows.push({key:'monetization',name:'Monetização',funnel:'Negócio',metric:'MER',value:num(mer),sample:sessions>=150||orders>=8,issues:moneyIssues,level:sessions<150&&orders<8?'insufficient':moneyIssues.length>=2?'critical':moneyIssues.length?'attention':'healthy'})
+    if(commercial&&maxCac&&cac>maxCac) moneyIssues.push(`CAC ${money(cac)} acima do limite ${money(maxCac)}`)
+    if(commercial&&minMer&&mer<minMer) moneyIssues.push(`MER ${num(mer)} abaixo do mínimo ${num(minMer)}`)
+    if(commercial&&previous.has_shopify&&lowerBad(conversion,prevConv,15)) moneyIssues.push(`conversão Shopify caiu ${num(Math.abs(change(conversion,prevConv)),1)}%`)
+    rows.push({key:'monetization',name:'Monetização',funnel:'Negócio',metric:'MER',value:current.mer==null?'—':num(mer),sample:commercial&&(sessions>=150||orders>=8),issues:moneyIssues,level:!commercial||sessions<150&&orders<8?'insufficient':moneyIssues.length>=2?'critical':moneyIssues.length?'attention':'healthy'})
     return rows
-  },[funnel,prevFunnel,counts.impressions,counts.clicks,counts.lpv,counts.atc,counts.checkout,sessions,orders,cac,mer,maxCac,minMer,conversion,previous.conversion_rate])
+  },[funnel,prevFunnel,counts.impressions,counts.clicks,counts.lpv,counts.atc,counts.checkout,sessions,orders,cac,mer,maxCac,minMer,conversion,commercial,current.mer,previous.has_shopify,previous.conversion_rate])
 
   const primary=useMemo(()=>{
     const severity={critical:4,attention:3,insufficient:2,healthy:1}
@@ -191,7 +192,7 @@ export default function ManagerDeep({data,onRefresh}){
 
     <section className="tm-command">
       <div className="tm-command-main"><span>PRINCIPAL DECISÃO AGORA</span><h2>{playbook.command}</h2><p>{playbook.why}</p><div className="tm-command-meta"><Badge tone={tone(primary.level)}>{stateLabel(primary.level)}</Badge><strong>{primary.name}</strong><em>{primary.metric}: {primary.value}</em></div></div>
-      <div className="tm-command-kpis"><Metric label="Receita" value={money(revenue)} note={revenueTarget?`meta ${money(revenueTarget)}`:'meta não definida'}/><Metric label="Investimento" value={money(spend)} note={budget?`orçamento ${money(budget)}`:'orçamento não definido'}/><Metric label="CAC" value={money(cac)} note={maxCac?`máx. ${money(maxCac)}`:'limite não definido'}/><Metric label="MER" value={num(mer)} note={minMer?`mín. ${num(minMer)}`:'mínimo não definido'}/></div>
+      <div className="tm-command-kpis"><Metric label="Receita Shopify" value={current.shopify_revenue==null?'—':money(revenue)} note={revenueTarget?`meta ${money(revenueTarget)}`:'meta não definida'}/><Metric label="Investimento" value={money(spend)} note={budget?`orçamento ${money(budget)}`:'orçamento não definido'}/><Metric label="CAC" value={orders>0?money(cac):'—'} note={maxCac?`máx. ${money(maxCac)}`:'limite não definido'}/><Metric label="MER" value={current.mer==null?'—':num(mer)} note={minMer?`mín. ${num(minMer)}`:'mínimo não definido'}/></div>
     </section>
 
     {!strategyReady&&<div className="tm-warning"><strong>Guardrails econômicos incompletos.</strong><span>O Gestor pode localizar gargalos, mas não deve recomendar escala agressiva sem CAC máximo, MER mínimo, orçamento ou meta de receita.</span></div>}

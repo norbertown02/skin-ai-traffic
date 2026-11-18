@@ -73,7 +73,9 @@ export default function StrategyPage({data,onGoManager}){
   const remainingRevenue=Math.max(0,revenueTarget-revenue), remainingBudget=Math.max(0,budget-spend)
   const revenueProgress=revenueTarget?clamp(revenue/revenueTarget*100):0
   const budgetProgress=budget?clamp(spend/budget*100):0
-  const cacHeadroom=maxCac?((maxCac-cac)/maxCac)*100:null
+  const commercial=Boolean(current.has_shopify)
+  const commercialValue=value=>commercial?value:'—'
+  const cacHeadroom=commercial&&orders>0&&maxCac?((maxCac-cac)/maxCac)*100:null
 
   const acquisitionState=stageState(fm.cpm,pf.cpm,'lower')
   const attentionState=stageState(fm.ctr,pf.ctr,'higher')
@@ -83,15 +85,20 @@ export default function StrategyPage({data,onGoManager}){
   const conversionPrimary=n(fm.checkout_to_purchase)||n(current.conversion_rate)*100
   const conversionPrev=n(pf.checkout_to_purchase)||n(previous.conversion_rate)*100
   const conversionState=stageState(conversionPrimary,conversionPrev,'higher')
-  let monetizationState=stageState(mer,n(previous.mer),'higher')
-  if(minMer&&mer<minMer*.85) monetizationState='bottleneck'; else if(minMer&&mer<minMer) monetizationState='watch'; else if(minMer&&mer>=minMer) monetizationState='healthy'
+  let monetizationState='insufficient'
+  if(current.mer!=null){
+    monetizationState=stageState(mer,n(previous.mer),'higher')
+    if(minMer&&mer<minMer*.85) monetizationState='bottleneck'
+    else if(minMer&&mer<minMer) monetizationState='watch'
+    else if(minMer) monetizationState='healthy'
+  }
 
   const stages=[
     {key:'acquisition',index:'01',name:'Aquisição',objective:'Comprar alcance suficiente sem pressionar excessivamente o custo de entrada.',metric:'CPM',value:money(fm.cpm),state:acquisitionState,signal:`Alcance ${integer(fm.reach)} · frequência ${num(fm.frequency)}`,metrics:[['Investimento',money(spend)],['CPM',money(fm.cpm)],['Alcance',integer(fm.reach)],['Frequência',num(fm.frequency)]],questions:['O custo para entrar no leilão está piorando?','Existe espaço de audiência para escalar?','A frequência indica saturação?'],actions:['Ampliar aquisição quando eficiência e frequência permitirem.','Investigar público/placement se CPM piorar sem deterioração criativa.']},
     {key:'attention',index:'02',name:'Atenção',objective:'Fazer a audiência parar, consumir a mensagem e gerar clique qualificado.',metric:'CTR',value:pct(fm.ctr),state:attentionState,signal:`CPC ${money(fm.cpc)} · ${integer(fm.link_clicks||fm.clicks)} cliques`,metrics:[['CTR',pct(fm.ctr)],['CPC',money(fm.cpc)],['Cliques',integer(fm.link_clicks||fm.clicks)],['Frequência',num(fm.frequency)]],questions:['Os criativos ainda chamam atenção?','A queda de eficiência começa antes do clique?','Existe dependência de poucas peças?'],actions:['Renovar hooks e conceitos quando CTR deteriorar.','Proteger peças vencedoras enquanto novos conceitos ganham amostra.']},
     {key:'intent',index:'03',name:'Intenção',objective:'Transformar atenção em interesse comercial real depois do clique.',metric:'LPV → carrinho',value:pct(fm.lpv_to_cart),state:intentState,signal:`Clique→LPV ${pct(fm.click_to_lpv)} · ${integer(fm.adds_to_cart)} carrinhos`,metrics:[['Clique → LPV',pct(fm.click_to_lpv)],['LPV → carrinho',pct(fm.lpv_to_cart)],['LPVs',integer(fm.landing_page_views)],['Carrinhos',integer(fm.adds_to_cart)]],questions:['O clique realmente chega à página?','A promessa do anúncio combina com a landing?','Quem chega demonstra intenção de compra?'],actions:['Separar problema de tráfego de problema de mensagem/página.','Priorizar prova, demonstração e benefício quando a intenção estiver fraca.']},
-    {key:'conversion',index:'04',name:'Conversão',objective:'Transformar intenção em checkout e compra sem perder eficiência no fundo.',metric:'Checkout → compra',value:pct(fm.checkout_to_purchase),state:conversionState,signal:`Carrinho→checkout ${pct(fm.cart_to_checkout)} · CAC ${money(cac)}`,metrics:[['Carrinho → checkout',pct(fm.cart_to_checkout)],['Checkout → compra',pct(fm.checkout_to_purchase)],['Compras',integer(orders)],['CAC blended',money(cac)]],questions:['Quem adiciona ao carrinho avança?','O checkout está segurando vendas?','Remarketing recebe volume suficiente para funcionar?'],actions:['Não mexer no fundo se ele estiver saudável e o gargalo estiver antes.','Investigar oferta, checkout e remarketing quando a perda começar aqui.']},
-    {key:'monetization',index:'05',name:'Monetização',objective:'Garantir que crescimento de mídia gere receita economicamente sustentável.',metric:'MER',value:num(mer),state:monetizationState,signal:`Receita ${money(revenue)} · ticket ${money(ticket)}`,metrics:[['Receita',money(revenue)],['MER',num(mer)],['Ticket',money(ticket)],['Conversão Shopify',pct(cvr)]],questions:['A venda paga o custo de aquisição?','A receita cresce na mesma direção do investimento?','O site monetiza bem cada sessão?'],actions:['Escalar apenas quando economia e capacidade do funil sustentarem.','Usar Shopify como verdade comercial e Meta como atribuição de mídia.']},
+    {key:'conversion',index:'04',name:'Conversão',objective:'Transformar intenção em checkout e compra sem perder eficiência no fundo.',metric:'Checkout → compra',value:pct(fm.checkout_to_purchase),state:conversionState,signal:`Carrinho→checkout ${pct(fm.cart_to_checkout)} · CAC ${commercialValue(money(cac))}`,metrics:[['Carrinho → checkout',pct(fm.cart_to_checkout)],['Checkout → compra',pct(fm.checkout_to_purchase)],['Compras Meta',integer(fm.purchases)],['CAC blended',commercialValue(money(cac))]],questions:['Quem adiciona ao carrinho avança?','O checkout está segurando vendas?','Remarketing recebe volume suficiente para funcionar?'],actions:['Não mexer no fundo se ele estiver saudável e o gargalo estiver antes.','Investigar oferta, checkout e remarketing quando a perda começar aqui.']},
+    {key:'monetization',index:'05',name:'Monetização',objective:'Garantir que crescimento de mídia gere receita economicamente sustentável.',metric:'MER',value:current.mer==null?'—':num(mer),state:monetizationState,signal:commercial?`Receita ${money(revenue)} · ticket ${money(ticket)}`:'Dados do Shopify indisponíveis.',metrics:[['Receita',commercialValue(money(revenue))],['MER',current.mer==null?'—':num(mer)],['Ticket',commercialValue(money(ticket))],['Conversão Shopify',commercialValue(pct(cvr))]],questions:['A venda paga o custo de aquisição?','A receita cresce na mesma direção do investimento?','O site monetiza bem cada sessão?'],actions:['Escalar apenas quando economia e capacidade do funil sustentarem.','Usar Shopify como verdade comercial e Meta como atribuição de mídia.']},
   ]
 
   const active=stages.find(x=>x.key===activeStage)||stages[0]
@@ -115,12 +122,12 @@ export default function StrategyPage({data,onGoManager}){
     </div>
 
     <div className="strategy-progress-grid">
-      <Readout label="Receita atual" value={money(revenue)} note={revenueTarget?`${num(revenueProgress,1)}% da meta`:'Defina uma meta de receita'}/>
-      <Readout label="Falta para a meta" value={revenueTarget?money(remainingRevenue):'—'} note={targetOrders?`${Math.max(0,targetOrders-orders)} pedidos restantes`:''}/>
+      <Readout label="Receita atual" value={commercialValue(money(revenue))} note={!commercial?'Shopify indisponível':revenueTarget?`${num(revenueProgress,1)}% da meta`:'Defina uma meta de receita'}/>
+      <Readout label="Falta para a meta" value={commercial&&revenueTarget?money(remainingRevenue):'—'} note={commercial&&targetOrders?`${Math.max(0,targetOrders-orders)} pedidos restantes`:''}/>
       <Readout label="Investimento" value={money(spend)} note={budget?`${num(budgetProgress,1)}% do orçamento`:'Defina orçamento'}/>
       <Readout label="Orçamento restante" value={budget?money(remainingBudget):'—'}/>
-      <Readout label="CAC atual" value={money(cac)} note={cacHeadroom===null?'Defina CAC máximo':cacHeadroom>=0?`${num(cacHeadroom,1)}% de folga`:`${num(Math.abs(cacHeadroom),1)}% acima do limite`}/>
-      <Readout label="MER atual" value={num(mer)} note={minMer?`mínimo ${num(minMer)}`:'Defina MER mínimo'}/>
+      <Readout label="CAC atual" value={orders>0?money(cac):'—'} note={!commercial?'Shopify indisponível':cacHeadroom===null?'Defina CAC máximo':cacHeadroom>=0?`${num(cacHeadroom,1)}% de folga`:`${num(Math.abs(cacHeadroom),1)}% acima do limite`}/>
+      <Readout label="MER atual" value={current.mer==null?'—':num(mer)} note={minMer?`mínimo ${num(minMer)}`:'Defina MER mínimo'}/>
     </div>
 
     {!targetConfigured&&<div className="strategy-warning"><strong>A estratégia econômica ainda não está configurada.</strong><span>O sistema consegue ler o funil, mas não deve concluir capacidade de escala ou eficiência econômica sem metas definidas pela empresa.</span></div>}

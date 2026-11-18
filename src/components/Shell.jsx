@@ -19,7 +19,7 @@ const secondary = [
 export default function Shell({tab,onTab,data,onLogout,children}) {
   const [advanced, setAdvanced] = useState(true)
   const lastMeta = sourceDate(data)
-  const shopMonth = data?.shopify?.business?.at?.(-1)?.month_start
+  const shopMonth = data?.shopify?.business?.filter(row => row.has_shopify).at(-1)?.month_start
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand-block"><div><strong>Skin Beauty</strong><span>Gestor de performance</span></div></div>

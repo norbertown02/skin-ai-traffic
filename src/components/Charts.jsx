@@ -42,7 +42,7 @@ export function HorizontalBars({ title, subtitle, rows, valueKey = 'spend', labe
 
 export function RetentionChart({ retention, height = 220 }) {
   const ref = useRef(null)
-  const data = [100, retention?.p25 || 0, retention?.p50 || 0, retention?.p75 || 0, retention?.p95 || 0, retention?.p100 || 0]
+  const data = [100, retention?.p25 ?? null, retention?.p50 ?? null, retention?.p75 ?? null, retention?.p95 ?? null, retention?.p100 ?? null]
   useEffect(() => {
     if (!ref.current) return
     const instance = new Chart(ref.current, {

@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Login from './components/Login.jsx'
 import Shell from './components/Shell.jsx'
-import DiagnosticModal from './components/DiagnosticModal.jsx'
 import ApprovalsPage from './pages/ApprovalsPage.jsx'
 import ExecutiveClean from './pages/ExecutiveClean.jsx'
 import ActionCenter from './pages/ActionCenter.jsx'
@@ -14,7 +13,7 @@ import AudienceDeep from './pages/AudienceDeep.jsx'
 import PlacementDeep from './pages/PlacementDeep.jsx'
 import EntityDeep from './pages/EntityDeep.jsx'
 import WasteDeep from './pages/WasteDeep.jsx'
-import { api, clearSession, endpoints, getSession, loadCoreData } from './api.js'
+import { clearSession, loadCoreData, subscribeSession } from './api.js'
 
 const validTabs = new Set(['actions','strategy','manager','executive','approvals','analysis','creatives','audiences','placements','campaigns','sets','ads','waste','integrations'])
 const hashTab = () => {
@@ -23,37 +22,34 @@ const hashTab = () => {
 }
 
 export default function App() {
-  const [session, setSession] = useState(getSession())
+  const [session, setSession] = useState(undefined)
   const [tab, setTab] = useState(hashTab)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [diagnosticId, setDiagnosticId] = useState(null)
+  const request = useRef(null)
 
-  function expireSession(message) {
-    clearSession(); setSession(null); setData(null); setError(message || '')
+  async function expireSession(message) {
+    request.current?.abort()
+    setLoading(false)
+    setSession(null); setData(null); setError(message || '')
+    await clearSession()
   }
 
   async function refresh() {
-    setLoading(true); setError('')
-    try { setData(await loadCoreData()) }
-    catch (e) {
-      const message = e.message || 'Falha ao carregar os dados do painel.'
-      if (/unauthorized|no-session|forbidden/i.test(message)) expireSession('Sua sessão expirou. Entre novamente.')
-      else setError(message)
-    } finally { setLoading(false) }
-  }
-
-  async function runManager() {
+    request.current?.abort()
+    const controller = new AbortController()
+    request.current = controller
     setLoading(true); setError('')
     try {
-      await api(endpoints.manager, { method: 'POST', body: JSON.stringify({ action: 'run' }) })
-      setData(await loadCoreData())
+      const report = await loadCoreData({}, controller.signal)
+      if (!controller.signal.aborted) setData(report)
     } catch (e) {
-      const message = e.message || 'Não foi possível atualizar a leitura do Gestor.'
-      if (/unauthorized|no-session|forbidden/i.test(message)) expireSession('Sua sessão expirou. Entre novamente.')
+      if (controller.signal.aborted) return
+      const message = e.message || 'Falha ao carregar os dados do painel.'
+      if (/^(unauthorized|no-session)$/i.test(message)) expireSession('Sua sessão expirou. Entre novamente.')
       else setError(message)
-    } finally { setLoading(false) }
+    } finally { if (!controller.signal.aborted) setLoading(false) }
   }
 
   function navigate(next) {
@@ -63,14 +59,26 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  useEffect(() => { if (session?.token) refresh() }, [session?.token])
+  useEffect(() => subscribeSession((userSession) => {
+    setSession(userSession)
+    if (!userSession) {
+      request.current?.abort()
+      setLoading(false)
+      setData(null)
+    }
+  }), [])
+  useEffect(() => {
+    if (session?.user?.id) refresh()
+    return () => request.current?.abort()
+  }, [session?.user?.id])
   useEffect(() => {
     const onHash = () => setTab(hashTab())
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
-  if (!session?.token) return <Login onSuccess={() => { setSession(getSession()); setError('') }} />
+  if (session === undefined) return <div className="app-loading"><p>Verificando acesso…</p></div>
+  if (!session) return <Login onSuccess={() => setError('')} />
 
   if (tab === 'executive') {
     return <div className="executive-standalone">
@@ -81,10 +89,10 @@ export default function App() {
   }
 
   const page = {
-    actions: <ActionCenter data={data} onNavigate={navigate} onRefresh={runManager} isLoading={loading} />,
+    actions: <ActionCenter data={data} onNavigate={navigate} onRefresh={refresh} isLoading={loading} />,
     strategy: <StrategyPage data={data} onGoManager={() => navigate('manager')} />,
-    manager: <ManagerDeep data={data} onOpen={setDiagnosticId} onRefresh={runManager} />,
-    approvals: <ApprovalsPage data={data} onOpen={setDiagnosticId} onRefresh={refresh} />,
+    manager: <ManagerDeep data={data} onRefresh={refresh} />,
+    approvals: <ApprovalsPage />,
     analysis: <AnalysisDeep data={data} />,
     creatives: <CreativesClean data={data} />,
     audiences: <AudienceDeep data={data} onNavigate={navigate} />,
@@ -100,6 +108,5 @@ export default function App() {
     {loading && !data ? <div className="app-loading"><div className="loading-mark">S</div><p>Carregando inteligência da operação…</p></div> : error && !data ? <div className="load-error"><h2>Não foi possível carregar o painel</h2><p>{error}</p><button className="btn primary" onClick={refresh}>Tentar novamente</button></div> : page}
     {error && data && <div className="refresh-error">{error}</div>}
     {loading && data && <div className="refresh-indicator">Atualizando dados…</div>}
-    {diagnosticId && <DiagnosticModal id={diagnosticId} onClose={() => setDiagnosticId(null)} onRefresh={refresh} />}
   </Shell>
 }
