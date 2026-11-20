@@ -19,7 +19,9 @@ test('Workspace v2 validates origin, user scope and write boundaries', async () 
    traffic.push(u)
    if(u.pathname==='/auth/v1/user') return Response.json({id:'u-1',app_metadata:{skin_report_account_id:authorized?account:'other-account'}})
    if(u.pathname.startsWith('/rest/v1/')){
-     if(!['POST'].includes(opts.method)) assert.equal(u.searchParams.get('account_id'),'eq.'+account)
+     if(u.pathname.includes('traffic_shopify_customer_mix')||u.pathname.includes('traffic_shopify_product_mix')){
+       assert.equal(u.searchParams.get('shop_domain'),'eq.9a70ec-cf.myshopify.com')
+     }else if(opts.method!=='POST')assert.equal(u.searchParams.get('account_id'),'eq.'+account)
      if(opts.method==='POST'||opts.method==='PATCH'||opts.method==='DELETE'){
        writes.push({url:u,method:opts.method,payload:opts.body?JSON.parse(opts.body):null})
        if(opts.method==='PATCH')return Response.json([])
