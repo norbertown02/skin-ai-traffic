@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 const projectUrl = import.meta.env.VITE_SUPABASE_URL
 const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 const auth = projectUrl && publishableKey ? createClient(projectUrl, publishableKey).auth : null
-const reportName = import.meta.env.VITE_TRAFFIC_REPORT_FUNCTION || (import.meta.env.MODE === 'p0-preview' ? 'traffic-report-p0-preview' : 'traffic-report')
+const reportName = import.meta.env.VITE_TRAFFIC_REPORT_FUNCTION || (import.meta.env.MODE === 'p0-preview' ? 'traffic-report-v2-preview' : 'traffic-report')
 const workspaceName = import.meta.env.VITE_TRAFFIC_WORKSPACE_FUNCTION || (import.meta.env.MODE === 'p0-preview' ? 'traffic-workspace-v2-preview' : 'traffic-workspace')
 export const endpoints = {
   report: projectUrl ? projectUrl + '/functions/v1/' + reportName : '',
