@@ -174,7 +174,7 @@ export default function App() {
     sets: <EntityDeep data={data} type="ad_set" />,
     ads: <EntityDeep data={data} type="ad" />,
     waste: <WasteDeep data={data} />,
-    integrations: <IntegrationsClean data={data} />,
+    integrations: <IntegrationsClean data={data} workspace={workspace} />,
   }[tab]
 
   return <Shell tab={tab} onTab={navigate} data={data} onLogout={() => expireSession('')}>
