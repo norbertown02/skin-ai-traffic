@@ -33,7 +33,7 @@ test('Shopify order ingestion keeps only minimal operational fields, pseudonymiz
 })
 test('Shopify cursor and checkpoint always use a fixed upper bound and a 48-hour overlap',()=>{
  const first=chooseSyncWindow({backfill_from:'2026-09-01T00:00:00Z'},new Date('2026-11-20T12:00:00Z'))
- assert.equal(first.from,'2026-09-01T00:00:00Z')
+ assert.equal(first.from,'2026-09-01T00:00:00.000Z')
  assert.equal(first.end,'2026-11-20T12:00:00.000Z')
  const overlap=chooseSyncWindow({last_success_at:'2026-11-20T12:00:00Z'},new Date('2026-11-20T13:00:00Z'))
  assert.equal(overlap.from,'2026-11-18T12:00:00.000Z')
