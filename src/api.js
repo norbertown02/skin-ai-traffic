@@ -3,8 +3,9 @@ import { createClient } from '@supabase/supabase-js'
 const projectUrl = import.meta.env.VITE_SUPABASE_URL
 const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 const auth = projectUrl && publishableKey ? createClient(projectUrl, publishableKey).auth : null
+const reportName = import.meta.env.VITE_TRAFFIC_REPORT_FUNCTION || (import.meta.env.MODE === 'p0-preview' ? 'traffic-report-p0-preview' : 'traffic-report')
 export const endpoints = {
-  report: projectUrl ? projectUrl + '/functions/v1/traffic-report' : '',
+  report: projectUrl ? projectUrl + '/functions/v1/' + reportName : '',
 }
 
 function requireAuth() {

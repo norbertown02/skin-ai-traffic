@@ -61,18 +61,20 @@ export default function App() {
   const periodParams = paramsForPeriod()
   async function refresh() {
     request.current?.abort()
-    if (!periodParams) { setError('Selecione um período válido.'); return }
+    if (!periodParams) { setLoading(false); setError('Selecione um período válido.'); return }
     const controller = new AbortController()
     request.current = controller
     setLoading(true); setError('')
     try {
       const report = await loadCoreData(periodParams, controller.signal)
       if (!controller.signal.aborted) {
-        const bounds=report?.bootstrap?.main?.period
-        if(bounds?.start&&bounds?.end){
-          const included=m=>{const key=String(m?.month_start||'').slice(0,7);return key && key>=bounds.start.slice(0,7)&&key<=bounds.end.slice(0,7)}
-          if(Array.isArray(report?.shopify?.business)) report.shopify.business=report.shopify.business.filter(included)
-          if(Array.isArray(report?.funnel?.months)) report.funnel.months=report.funnel.months.filter(included)
+        if (!report?.bootstrap?.performance?.comparison) {
+          const bounds=report?.bootstrap?.main?.period
+          if(bounds?.start&&bounds?.end){
+            const included=m=>{const key=String(m?.month_start||'').slice(0,7);return key && key>=bounds.start.slice(0,7)&&key<=bounds.end.slice(0,7)}
+            if(Array.isArray(report?.shopify?.business)) report.shopify.business=report.shopify.business.filter(included)
+            if(Array.isArray(report?.funnel?.months)) report.funnel.months=report.funnel.months.filter(included)
+          }
         }
         setData(report)
       }

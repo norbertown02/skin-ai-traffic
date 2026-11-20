@@ -31,6 +31,11 @@ export function classifyFunnelContext(row={}){
   const explicit=norm(row.funnel_stage||row.stage)
   if(['top','middle','bottom','customer','mixed'].includes(explicit)) return {stage:explicit,confidence:100,reason:'Classificação explícita da estrutura.'}
 
+  if (row.audience_evidence) {
+    const stage = ({ Lookalike:'top', Amplo:'top', Interesses:'top', 'Advantage+':'mixed' })[row.audience_type] ?? 'unknown'
+    return { stage, reason:row.audience_evidence }
+  }
+
   if(mixedPattern.test(hay)) return {stage:'mixed',confidence:86,reason:'Estrutura Advantage+/mista pode combinar prospecção e remarketing.'}
   if(hotPattern.test(hay)) return {stage:'bottom',confidence:94,reason:'Audiência indica intenção forte: carrinho, checkout ou abandono.'}
   if(customerPattern.test(hay)) return {stage:'customer',confidence:92,reason:'Audiência indica compradores/clientes.'}
