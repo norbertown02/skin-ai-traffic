@@ -50,9 +50,11 @@ function StageCard({stage,active,onClick}){
 
 function Readout({label,value,note}){return <div className="strategy-readout"><span>{label}</span><strong>{value}</strong>{note&&<small>{note}</small>}</div>}
 
-export default function StrategyPage({data,onGoManager}){
+export default function StrategyPage({data,onGoManager,workspace,onSaveStrategy}){
   const [strategy,setStrategy]=useState(loadStrategy)
   const [saved,setSaved]=useState(false)
+  const [saving,setSaving]=useState(false)
+  const [saveError,setSaveError]=useState('')
   const [activeStage,setActiveStage]=useState('acquisition')
 
   const business=data?.shopify?.business||[]
@@ -62,9 +64,17 @@ export default function StrategyPage({data,onGoManager}){
   const fm=useMemo(()=>funnels.find(x=>x.month_start===current.month_start)||funnels.at?.(-1)||{},[funnels,current.month_start])
   const pf=useMemo(()=>funnels.find(x=>x.month_start===previous.month_start)||funnels.at?.(-2)||{},[funnels,previous.month_start])
 
+  useEffect(()=>{if(workspace?.settings && Object.keys(workspace.settings).length){setStrategy(old=>({...old,...workspace.settings}))}},[workspace?.settings])
   useEffect(()=>{setSaved(false)},[strategy])
   const change=(key,value)=>setStrategy(s=>({...s,[key]:value}))
-  const save=()=>{localStorage.setItem(STORAGE_KEY,JSON.stringify(strategy));setSaved(true)}
+  const save=async()=>{
+    setSaving(true);setSaveError('')
+    try{
+      if(typeof onSaveStrategy==='function') await onSaveStrategy(strategy)
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(strategy))
+      setSaved(true)
+    }catch(error){setSaveError(error.message||'Não foi possível salvar as metas')}finally{setSaving(false)}
+  }
 
   const revenue=n(current.shopify_revenue), orders=n(current.shopify_orders), spend=n(current.meta_spend), sessions=n(current.sessions)
   const ticket=orders?revenue/orders:0, cac=orders?spend/orders:0, cvr=n(current.conversion_rate)*100, mer=n(current.mer)
@@ -108,7 +118,7 @@ export default function StrategyPage({data,onGoManager}){
   const allocationTotal=n(strategy.acquisition_pct)+n(strategy.retargeting_pct)+n(strategy.testing_pct)
 
   return <div className="page strategy-page">
-    <PageHeader eyebrow="ESTRATÉGIA" title="Sistema de crescimento" description="Define as regras do jogo antes de analisar a conta. Metas humanas, economia e prioridades orientam o Gestor; os dados mostram onde a estratégia está funcionando ou travando." actions={<button className="btn primary" onClick={save}>{saved?'Estratégia salva':'Salvar estratégia'}</button>}/>
+    <PageHeader eyebrow="ESTRATÉGIA" title="Sistema de crescimento" description="Define as regras do jogo antes de analisar a conta. Metas humanas, economia e prioridades orientam o Gestor; os dados mostram onde a estratégia está funcionando ou travando." actions={<button className="btn primary" disabled={saving} onClick={save}>{saving?'Salvando…':saved?'Estratégia salva no Supabase':'Salvar estratégia'}</button>}/>
 
     <section className="strategy-origin-grid">
       <article className="strategy-origin human"><span>DEFINIDO PELA EMPRESA</span><h2>Objetivo e limites</h2><p>Receita, orçamento, CAC aceitável e prioridades não devem ser inventados pela IA.</p></article>
@@ -140,6 +150,7 @@ export default function StrategyPage({data,onGoManager}){
       <div className="strategy-stage-side"><div className="strategy-stage-metrics">{active.metrics.map(([l,v])=><Readout key={l} label={l} value={v}/>)}</div><div className="strategy-actions"><span>LINHA DE AÇÃO</span>{active.actions.map((x,i)=><p key={i}>→ {x}</p>)}</div></div>
     </section>
 
+    {saveError&&<p className="ps-warning" role="alert">{saveError}</p>}
     <SectionHeader number="03" eyebrow="ALOCACÃO" title="Como queremos usar a verba" description="A distribuição é um plano humano. O Gestor poderá recomendar mudanças, mas não deve assumir percentuais sem contexto econômico e estratégico."/>
     <div className="strategy-allocation-layout">
       <Surface eyebrow="PLANO DE VERBA" title="Distribuição desejada"><div className="strategy-allocation-fields"><Field label="Aquisição" suffix="%" value={strategy.acquisition_pct} onChange={v=>change('acquisition_pct',v)}/><Field label="Retargeting" suffix="%" value={strategy.retargeting_pct} onChange={v=>change('retargeting_pct',v)}/><Field label="Testes" suffix="%" value={strategy.testing_pct} onChange={v=>change('testing_pct',v)}/></div><div className={`strategy-allocation-total ${allocationTotal===100?'ok':'bad'}`}>Total <strong>{num(allocationTotal,0)}%</strong><span>{allocationTotal===100?'Distribuição consistente':'Os percentuais precisam somar 100%'}</span></div></Surface>

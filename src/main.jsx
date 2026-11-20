@@ -14,6 +14,7 @@ import './app-v7.css'
 import './app-v8.css'
 import './app-v9.css'
 import './creative-quality.css'
+import './professional-suite.css'
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />

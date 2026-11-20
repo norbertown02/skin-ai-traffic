@@ -10,7 +10,7 @@ const statusLabels = {
 }
 const amount = (value, format) => value == null ? '—' : format(value)
 
-export default function IntegrationsClean({ data }) {
+export default function IntegrationsClean({ data, workspace }) {
   const [utmStatus, setUtmStatus] = useState('')
   const business = data?.shopify?.business ?? []
   const quality = data?.manager?.quality ?? []
@@ -18,6 +18,9 @@ export default function IntegrationsClean({ data }) {
   const sources = data?.sources
   const utmAds = (utm?.ads ?? []).filter(row => !utmStatus || row.status === utmStatus)
   const latestShopify = business.filter(row => row.has_shopify).at(-1)
+  const importedProducts=workspace?.productMix??[]
+  const importedSegments=workspace?.customerMix??[]
+  const importedAt=importedProducts.map(row=>row.synced_at).filter(Boolean).sort().at(-1)
   return <div className="page pro-page integrations-page">
     <PageHeader eyebrow="INTEGRAÇÕES" title="Saúde das fontes de dados" description="Cobertura, atualização e diagnóstico do histórico armazenado." />
     <div className="pro-integration-grid">
@@ -30,6 +33,12 @@ export default function IntegrationsClean({ data }) {
         <p>Histórico de entrega e conversões atribuídas. Conexão ao vivo não verificada.</p>
       </Surface>
     </div>
+    <Surface eyebrow="CAMADAS COMERCIAIS" title="Cobertura dos agregados Shopify">
+      <p>Produtos vendidos: {integer(importedProducts.length)} registros mensais · novos e recorrentes: {integer(importedSegments.length)} registros mensais.</p>
+      <p>Última importação desses recortes: {instant(importedAt)}. Essa data é independente da sincronização de Meta Ads.</p>
+      <p>O app ainda não possui pedidos individuais, SKU de cada pedido e identificação de clientes para conciliação completa. Os agregados por produto não devem ser somados como pedidos únicos.</p>
+      <p>Sincronização automática por API da Shopify: pendente de autorização e credencial segura da loja; não há rotina automática para esses recortes neste momento.</p>
+    </Surface>
     {sources && <Surface eyebrow="VALIDAÇÃO" title="Meta Ads e Shopify">
       <p>O Meta atribui conversões à mídia. A Shopify contabiliza pedidos e vendas totais da loja. A diferença é diagnóstica e só aparece quando as datas coincidem.</p>
       <div className="table-wrap"><table><thead><tr><th>Período de mídia</th><th>Shopify até</th><th>Compras Meta</th><th>Pedidos Shopify</th><th>Receita Meta</th><th>Vendas Shopify</th><th>Diferença de compras</th><th>Diferença de receita</th><th>Cobertura</th></tr></thead>

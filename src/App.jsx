@@ -13,18 +13,24 @@ import AudienceDeep from './pages/AudienceDeep.jsx'
 import PlacementDeep from './pages/PlacementDeep.jsx'
 import EntityDeep from './pages/EntityDeep.jsx'
 import WasteDeep from './pages/WasteDeep.jsx'
-import { clearSession, loadCoreData, subscribeSession } from './api.js'
+import { clearSession, loadCoreData, subscribeSession, workspaceRequest } from './api.js'
+import { Cockpit, FunnelLab, CompareMedia } from './pages/ProfessionalSuite.jsx'
+import ChangeHistory from './pages/ChangeHistory.jsx'
+import CommerceIntelligence from './pages/CommerceIntelligence.jsx'
+import { EconomicsStudio, ExperimentCenter } from './pages/ProfessionalWork.jsx'
 
-const validTabs = new Set(['actions','strategy','manager','executive','approvals','analysis','creatives','audiences','placements','campaigns','sets','ads','waste','integrations'])
+const validTabs = new Set(['commerce','history','cockpit','funnel','compare','economics','experiments','actions','strategy','manager','executive','approvals','analysis','creatives','audiences','placements','campaigns','sets','ads','waste','integrations'])
 const hashTab = () => {
   const key = String(window.location.hash || '').replace(/^#\/?/, '')
-  return validTabs.has(key) ? key : 'actions'
+  return validTabs.has(key) ? key : 'cockpit'
 }
 
 export default function App() {
   const [session, setSession] = useState(undefined)
   const [tab, setTab] = useState(hashTab)
   const [data, setData] = useState(null)
+  const [workspace, setWorkspace] = useState({settings:{},products:[],items:[],tags:[]})
+  const [workspaceError, setWorkspaceError] = useState('')
   const [periodMode, setPeriodMode] = useState('month')
   const [periodMonth, setPeriodMonth] = useState(String(new Date().getMonth()+1).padStart(2,'0'))
   const [periodYear, setPeriodYear] = useState(String(new Date().getFullYear()))
@@ -37,7 +43,7 @@ export default function App() {
   async function expireSession(message) {
     request.current?.abort()
     setLoading(false)
-    setSession(null); setData(null); setError(message || '')
+    setSession(null); setData(null); setWorkspace({settings:{},products:[],items:[],tags:[]}); setError(message || '')
     await clearSession()
   }
 
@@ -86,6 +92,14 @@ export default function App() {
     } finally { if (!controller.signal.aborted) setLoading(false) }
   }
 
+  async function onWorkspaceAction(action,payload) {
+    await workspaceRequest(action,payload)
+    const latest=await workspaceRequest()
+    setWorkspace(latest)
+    setWorkspaceError('')
+    return latest
+  }
+
   function navigate(next) {
     if (!validTabs.has(next)) return
     setTab(next)
@@ -99,8 +113,18 @@ export default function App() {
       request.current?.abort()
       setLoading(false)
       setData(null)
+      setWorkspace({settings:{},products:[],items:[],tags:[]})
     }
   }), [])
+  useEffect(() => {
+    if(!session?.user?.id) return
+    let alive=true
+    const controller=new AbortController()
+    workspaceRequest(undefined,undefined,controller.signal)
+      .then(value=>{if(alive){setWorkspace(value);setWorkspaceError('')}})
+      .catch(error=>{if(alive)setWorkspaceError(error.message||'Espaço de trabalho indisponível')})
+    return ()=>{alive=false;controller.abort()}
+  },[session?.user?.id])
   useEffect(() => {
     if (session?.user?.id) refresh()
     return () => request.current?.abort()
@@ -131,23 +155,31 @@ export default function App() {
   }
 
   const page = {
+    commerce: <CommerceIntelligence data={data} workspace={workspace} onNavigate={navigate}/>,
+    history: <ChangeHistory data={data} workspace={workspace} onNavigate={navigate}/>,
+    cockpit: <Cockpit data={data} workspace={workspace} onNavigate={navigate}/>,
+    funnel: <FunnelLab data={data}/>,
+    compare: <CompareMedia data={data}/>,
+    economics: <EconomicsStudio data={data} workspace={workspace} onWorkspaceAction={onWorkspaceAction}/>,
+    experiments: <ExperimentCenter data={data} workspace={workspace} onWorkspaceAction={onWorkspaceAction} onNavigate={navigate}/>,
     actions: <ActionCenter data={data} onNavigate={navigate} onRefresh={refresh} isLoading={loading} />,
-    strategy: <StrategyPage data={data} onGoManager={() => navigate('manager')} />,
-    manager: <ManagerDeep data={data} onRefresh={refresh} />,
-    approvals: <ApprovalsPage />,
+    strategy: <StrategyPage data={data} workspace={workspace} onSaveStrategy={async settings => onWorkspaceAction('save_settings',{settings})} onGoManager={() => navigate('manager')} />,
+    manager: <ManagerDeep data={data} workspace={workspace} onRefresh={refresh} />,
+    approvals: <ExperimentCenter data={data} workspace={workspace} onWorkspaceAction={onWorkspaceAction} onNavigate={navigate}/>,
     analysis: <AnalysisDeep data={data} />,
-    creatives: <CreativesClean data={data} />,
+    creatives: <CreativesClean data={data} workspace={workspace} onWorkspaceAction={onWorkspaceAction} />,
     audiences: <AudienceDeep data={data} onNavigate={navigate} />,
     placements: <PlacementDeep data={data} />,
     campaigns: <EntityDeep data={data} type="campaign" />,
     sets: <EntityDeep data={data} type="ad_set" />,
     ads: <EntityDeep data={data} type="ad" />,
     waste: <WasteDeep data={data} />,
-    integrations: <IntegrationsClean data={data} />,
+    integrations: <IntegrationsClean data={data} workspace={workspace} />,
   }[tab]
 
   return <Shell tab={tab} onTab={navigate} data={data} onLogout={() => expireSession('')}>
     {periodControl}
+    {workspaceError && <div className="refresh-error" role="status">Metas, custos e testes: {workspaceError}. Os dados de mídia permanecem disponíveis.</div>}
     {loading && !data ? <div className="app-loading"><div className="loading-mark">S</div><p>Carregando inteligência da operação…</p></div> : error && !data ? <div className="load-error"><h2>Não foi possível carregar o painel</h2><p>{error}</p><button className="btn primary" onClick={refresh}>Tentar novamente</button></div> : page}
     {error && data && <div className="refresh-error">{error}</div>}
     {loading && data && <div className="refresh-indicator">Atualizando dados…</div>}

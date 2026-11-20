@@ -258,6 +258,12 @@ export function buildReport(source, period) {
     return { id:row.id, name:row.ad_name, spend:row.spend, ...check }
   })
   const previous = period.previous?.available ? sum(source.previousDaily ?? []) : null
+  const priorRows = period.previous?.available ? (source.previousDaily ?? []).map(row=>({...row,...knownContext(row.ad_id)})) : []
+  const priorEntities = {
+    ads:group(priorRows,row=>({key:row.ad_id,id:row.ad_id,name:row.ad_name})),
+    sets:group(priorRows,row=>row.ad_set_id && ({key:row.ad_set_id,id:row.ad_set_id,name:row.ad_set_name})),
+    campaigns:group(priorRows,row=>row.campaign_id && ({key:row.campaign_id,id:row.campaign_id,name:row.campaign_name})),
+  }
   const sourceDates = source.sourceDates ?? {}
   const quality = Object.entries(period.coverage).map(([key, covered]) => ({
     name:({ ads:'Entrega Meta', age_gender:'Idade e gênero', region:'Regiões', placements:'Posicionamentos' })[key],
@@ -288,7 +294,7 @@ export function buildReport(source, period) {
       by_region:group(source.audience.filter((r) => r.breakdown === 'region'), (r) => ({key:r.region || 'Não informada'})),
     },
     deep:{
-      creative_profiles:creativeProfiles, benchmarks:{avg_ctr:total.ctr},
+      creative_profiles:creativeProfiles, benchmarks:{avg_ctr:total.ctr}, comparison:priorEntities,
       cross:{creative_audience:creativeAudience,creative_placement_set:creativePlacement},
       placements:group(source.placements, (r) => ({key:r.publisher_platform+' · '+r.platform_position})),
       waste,
