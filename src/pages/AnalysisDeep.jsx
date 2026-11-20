@@ -1,3 +1,4 @@
+import PeriodComparison from '../components/PeriodComparison.jsx'
 import React, { useEffect, useState } from 'react'
 import { loadCoreData } from '../api.js'
 import { ChartCard, HorizontalBars } from '../components/Charts.jsx'
@@ -24,6 +25,7 @@ export default function AnalysisDeep({data}){
 
   return <div className="page deep-page analysis-deep">
     <PageHeader eyebrow="ANÁLISE DETALHADA" title="Central de investigação" description="Aprofunda o que o relatório executivo apontou: leilão, atenção, qualidade do clique, público, placement, criativo e fundo de funil."/>
+    <PeriodComparison data={data}/>
     {source?.bootstrap?.main?.period?.coverage?.placements===false&&<p role="status">A base tem cobertura parcial de posicionamentos neste período.</p>}
     <div className="tabs deep-tabs">{tabs.map(([k,l])=><button key={k} className={tab===k?'active':''} onClick={()=>setTab(k)}>{l}</button>)}</div>
 

@@ -85,3 +85,11 @@ export const cleanAdText = (value) => {
     .replace(/\s+([,.;:])/g, '$1')
     .trim()
 }
+
+export function equalMonthlyWindows(current, previous, endField) {
+  if (!current?.[endField] || !previous?.[endField]) return false
+  const currentStart = current.start ?? current.month_start
+  const previousStart = previous.start ?? previous.month_start
+  return Date.parse(currentStart) === Date.parse(previous[endField]) + 86400000 &&
+    Date.parse(current[endField]) - Date.parse(currentStart) === Date.parse(previous[endField]) - Date.parse(previousStart)
+}

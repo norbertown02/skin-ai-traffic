@@ -1,5 +1,9 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "buildCommand": "if [ \"$VERCEL_ENV\" = preview ]; then npm run build -- --mode p0-preview; else npm run build; fi"
 }

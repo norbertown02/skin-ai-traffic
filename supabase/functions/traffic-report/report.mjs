@@ -1,3 +1,5 @@
+import { classifyAudience, inspectUtm } from './quality.mjs'
+
 const metricKeys = [
   'spend', 'impressions', 'clicks', 'link_clicks', 'landing_page_views', 'add_to_cart',
   'checkouts', 'purchases', 'revenue', 'video_plays', 'video_25', 'video_50', 'video_75',
@@ -48,6 +50,19 @@ function sum(rows) {
   return group(rows, () => ({ key: 'total' }))[0] ?? metrics({})
 }
 
+function covers(runs, stream, start, end) {
+    let cursor = start
+    const sorted = runs.filter((row) => row.stream === stream)
+      .sort((a, b) => a.date_from.localeCompare(b.date_from))
+    for (const row of sorted) {
+      if (row.date_to < cursor) continue
+      if (row.date_from > cursor) break
+      cursor = addDays(row.date_to, 1)
+      if (cursor > end) return true
+    }
+    return false
+  }
+
 export function periodFromRuns(runs, params) {
   const ads = runs.filter((row) => row.stream === 'ads')
   if (!ads.length) return null
@@ -72,21 +87,13 @@ export function periodFromRuns(runs, params) {
   if (start < dates.first || start > end || Date.parse(end) - Date.parse(start) >= 366 * 86400000) {
     throw new RangeError('O intervalo está fora do histórico disponível.')
   }
-  const covered = (stream) => {
-    let cursor = start
-    const sorted = runs.filter((row) => row.stream === stream)
-      .sort((a, b) => a.date_from.localeCompare(b.date_from))
-    for (const row of sorted) {
-      if (row.date_to < cursor) continue
-      if (row.date_from > cursor) break
-      cursor = addDays(row.date_to, 1)
-      if (cursor > end) return true
-    }
-    return false
-  }
+  const covered = (stream) => covers(runs, stream, start, end)
+  const days = Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1
+  const previous = { start:addDays(start, -days), end:addDays(start, -1), days }
+  previous.available = covers(runs, 'ads', previous.start, previous.end)
   if (!covered('ads')) throw new RangeError('O histórico de anúncios tem lacunas no período selecionado.')
   return {
-    start, end, first: dates.first, last: dates.last, requestedEnd: rawUntil ?? end,
+    start, end, days, previous, first: dates.first, last: dates.last, requestedEnd: rawUntil ?? end,
     coverage: Object.fromEntries(['ads', 'age_gender', 'region', 'placements'].map((s) => [s, covered(s)])),
   }
 }
@@ -102,15 +109,13 @@ export function buildReport(source, period) {
     const setRow = set.get(row.ad_set_id) ?? {}
     const campaignRow = campaign.get(row.campaign_id) ?? {}
     const targeting = setRow.targeting ?? {}
-    const type = setRow.audience_type ?? (
-      Array.isArray(targeting.custom_audiences) && targeting.custom_audiences.some((item) => /lookalike|semelhante/i.test(item?.name ?? '')) ? 'Lookalike' : null
-    )
+    const classification = classifyAudience(setRow)
     return {
       ad_id: adId, ad_name: row.name, status: row.effective_status,
       campaign_id: row.campaign_id, campaign_name: campaignRow.name,
       ad_set_id: row.ad_set_id, ad_set_name: setRow.name,
       creative_id: row.creative_id, creative_name: creative.get(row.creative_id)?.name ?? 'Criativo sem vínculo',
-      type: type ?? 'Não classificado', audience_type: type,
+      type: classification.type, audience_type: classification.type, audience_evidence: classification.evidence,
       age: targeting.age_min || targeting.age_max ? [targeting.age_min, targeting.age_max].filter(Boolean).join('–') : null,
       gender: targeting.genders?.length === 1 ? ({1:'Masculino',2:'Feminino'}[targeting.genders[0]] ?? null) : null,
     }
@@ -167,7 +172,8 @@ export function buildReport(source, period) {
     const values=creativeMetricMap.get(String(row.id))||metrics({})
     const active=linkedAds.some(ad=>ad.status==='ACTIVE')
     const delivered=n(values.impressions)>0||n(values.spend)>0
-    return {...row, metrics:values, ads:linkedAds, ad_count:linkedAds.length,
+    const { configuration, ...publicCreative } = row
+    return {...publicCreative, metrics:values, ads:linkedAds, ad_count:linkedAds.length,
       active, delivered, current_status:active?'ACTIVE':linkedAds.length?'INACTIVE':'UNLINKED',
       audiences:audiencesByCreative.get(row.id)??[], placements:placementsByCreative.get(row.id)??[]}
   }).sort((a,b)=>n(b.metrics?.spend)-n(a.metrics?.spend))
@@ -196,40 +202,83 @@ export function buildReport(source, period) {
       post_click:wasteItems.filter(x=>x.category==='post_click').length,
       audience_mismatch:0,placement_mismatch:0}
   }}
-  const funnel = source.monthly.map((row) => ({
-    month_start:row.month_start, through_date:row.meta_through_date,
-    reach:row.meta_reach, frequency:row.frequency,
-    ...metrics({
-      spend:row.meta_spend, impressions:row.meta_impressions, clicks:row.meta_clicks,
-      link_clicks:row.meta_link_clicks, landing_page_views:row.meta_lpv, add_to_cart:row.meta_add_to_cart,
-      checkouts:row.meta_checkouts, purchases:row.meta_purchases, revenue:row.meta_revenue,
-    }),
-  }))
-  const shopify = new Map(source.business.filter((row) => row.shop_domain).map((row) => [row.month_start,row]))
-  // Shopify numbers arrive at month granularity. Do not attribute full-month
-  // orders/revenue to an arbitrary date interval within that month.
-  const fullMonthSelection = period.start.slice(8)==='01' &&
-    (period.end === period.last || addDays(period.end,1).slice(8)==='01')
-  const business = source.monthly.map((row) => {
-    const rawShopify = shopify.get(row.month_start)
-    const commercial = fullMonthSelection && rawShopify &&
-      rawShopify.shopify_through_date <= period.end &&
-      rawShopify.shopify_through_date >= period.start ? rawShopify : null
-    return {
-      ...commercial, month_start:row.month_start, meta_spend:row.meta_spend, meta_roas:row.meta_roas,
-      meta_through_date:row.meta_through_date, meta_purchases:row.meta_purchases, meta_revenue:row.meta_revenue,
-      has_shopify:Boolean(commercial),
+  const monthly = new Map(source.monthly.map(row => [row.month_start, row]))
+  const shopify = new Map(source.business.map(row => [row.month_start, row]))
+  const funnel = []
+  const business = []
+  let mismatches = 0
+  let checked = 0
+  for (let month = period.start.slice(0,7)+'-01'; month <= period.end;
+    month = addDays(month, 32).slice(0,7)+'-01') {
+    const next = addDays(month, 32).slice(0,7)+'-01'
+    const start = month < period.start ? period.start : month
+    const end = addDays(next, -1) < period.end ? addDays(next, -1) : period.end
+    const monthMetrics = sum(withContext.filter(row => row.date >= start && row.date <= end))
+    const snapshot = monthly.get(month)
+    const alignedMeta = start === month && snapshot?.meta_through_date === end
+    const rawShopify = shopify.get(month)
+    const commercial = start === month && rawShopify?.shopify_through_date === end && rawShopify.currency === 'BRL' ? rawShopify : null
+    const { spend, roas, revenue, purchases } = monthMetrics
+    if (alignedMeta && spend != null && snapshot.meta_spend != null) {
+      checked++
+      if (Math.abs(spend - snapshot.meta_spend) >= 0.01 ||
+          (purchases != null && snapshot.meta_purchases != null && Math.abs(purchases - snapshot.meta_purchases) >= 0.001)) mismatches++
+    }
+    const aligned = Boolean(commercial)
+    const orders = commercial?.shopify_orders
+    const sales = commercial?.shopify_revenue
+
+    funnel.push({
+      month_start:month, start, through_date:end,
+      reach:alignedMeta ? snapshot.meta_reach : null,
+      frequency:alignedMeta ? snapshot.frequency : null,
+      ...monthMetrics,
+    })
+    business.push({
+      month_start:month, start, meta_through_date:end, meta_spend:spend, meta_roas:roas,
+      meta_purchases:purchases, meta_revenue:revenue,
+      shopify_revenue:sales, shopify_orders:orders, sessions:commercial?.sessions,
+      shopify_through_date:rawShopify?.shopify_through_date, shopify_synced_at:rawShopify?.shopify_synced_at,
+      has_shopify:aligned,
+      comparison_status:aligned ? 'aligned' : rawShopify ? 'different_window' : 'missing',
+      purchase_gap:aligned && orders != null && purchases != null ? purchases-orders : null,
+      revenue_gap:aligned && sales != null && revenue != null ? revenue-sales : null,
+      mer:aligned && sales != null ? ratio(sales,spend) : null,
+      cac:aligned && spend != null ? ratio(spend,orders) : null,
       conversion_rate:commercial?.conversion_rate == null ? null : n(commercial.conversion_rate) / 100,
       cart_additions:commercial?.sessions_with_cart, reached_checkout:commercial?.sessions_reached_checkout,
       completed_checkout:commercial?.sessions_converted,
-    }
+    })
+  }
+  const statuses = {}
+  const utmByCreative = new Map(source.creatives.map(row => [row.id, inspectUtm(row.configuration)]))
+  const utms = ads.map(row => {
+    const check = utmByCreative.get(row.creative_id) ?? inspectUtm()
+    statuses[check.status] = (statuses[check.status] ?? 0) + 1
+    return { id:row.id, name:row.ad_name, spend:row.spend, ...check }
   })
+  const previous = period.previous?.available ? sum(source.previousDaily ?? []) : null
+  const sourceDates = source.sourceDates ?? {}
+  const quality = Object.entries(period.coverage).map(([key, covered]) => ({
+    name:({ ads:'Entrega Meta', age_gender:'Idade e gênero', region:'Regiões', placements:'Posicionamentos' })[key],
+    status:covered?'ok':'warning', message:covered?'Cobertura integral do filtro':'Histórico com cobertura incompleta no filtro',
+  }))
+  quality.push(
+    { name:'Comparação de mídia', status:previous?'ok':'warning',
+      message:previous?'Janela anterior coberta':'Sem cobertura integral na janela anterior de mesma duração' },
+    { name:'Meta diário × consolidado', status:checked && !mismatches?'ok':'warning',
+      message:checked?mismatches+' de '+checked+' janelas com divergência em gasto ou compras':'Nenhum consolidado com a mesma cobertura para validar' },
+    { name:'Shopify no filtro', status:business.every(row=>row.has_shopify)?'ok':'warning',
+      message:business.filter(row=>row.has_shopify).length+' de '+business.length+' intervalos mensais com datas alinhadas' },
+    { name:'Segmentação', status:byType.some(row=>row.key==='Não classificado')?'warning':'ok',
+      message:'Classificação pela configuração atual. Gasto sem classificação: '+(byType.find(row=>row.key==='Não classificado')?.spend ?? 0).toFixed(2)+' BRL' },
+  )
   return {
     bootstrap:{
       main:{ period, cur:{ k:total, ads, sets, campaigns }, daily, audienceRows:sets, audienceSummary:{ by_type:byType } },
-      performance:{ daily, periods:{ current:total, current30:total } },
+      performance:{ daily, periods:{ current:total, current30:total, previous }, comparison:period.previous },
     },
-    shopify:{ business, available:business.some(row=>row.has_shopify), monthly_only:true, period_compatible:fullMonthSelection },
+    shopify:{ business, available:business.some(row=>row.has_shopify), monthly_only:true, period_compatible:business.some(row=>row.has_shopify) },
     funnel:{ months:funnel },
     audience:{
       total,
@@ -244,10 +293,9 @@ export function buildReport(source, period) {
       placements:group(source.placements, (r) => ({key:r.publisher_platform+' · '+r.platform_position})),
       waste,
     },
-    manager:{ decisions:[], quality:[
-      { name:'Cobertura diária do Meta Ads',status:'ok',message:period.start+' a '+period.end },
-      { name:'Shopify',status:shopify.size > 0 ? 'ok' : 'pending',message:shopify.size > 0 ? 'Dados comerciais disponíveis.' : 'A nova base ainda não tem dados comerciais.' },
-    ] },
+    utm:{ counts:statuses, ads:utms },
+    sources:sourceDates,
+    manager:{ decisions:[], quality },
   }
 }
 

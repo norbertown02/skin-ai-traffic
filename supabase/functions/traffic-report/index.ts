@@ -1,6 +1,7 @@
 import { buildReport, periodFromRuns } from "./report.mjs";
 
 const accountId = "2985215308420830";
+const shopDomain = "9a70ec-cf.myshopify.com";
 const base = Deno.env.get("SUPABASE_URL")!;
 const defaultKey = (variable: string) => JSON.parse(Deno.env.get(variable) || "{}").default;
 const publicKey = defaultKey("SUPABASE_PUBLISHABLE_KEYS") || Deno.env.get("SUPABASE_ANON_KEY");
@@ -57,7 +58,7 @@ Deno.serve(async (req: Request) => {
     const params = new URL(req.url).searchParams;
     const eq = "eq." + accountId;
     const runs = await readAll("sync_runs", {
-      select: "stream,date_from,date_to", source_id: "eq.meta", scope_id: eq, status: "eq.succeeded",
+      select: "stream,date_from,date_to,finished_at", source_id: "eq.meta", scope_id: eq, status: "eq.succeeded",
       order: "date_from.asc,id.asc",
     });
     const period = periodFromRuns(runs, params);
@@ -65,7 +66,8 @@ Deno.serve(async (req: Request) => {
 
     const dates = { account_id: eq, and: "(date.gte." + period.start + ",date.lte." + period.end + ")" };
     const baseMetrics = "ad_id,spend,impressions,clicks,link_clicks,purchases,revenue";
-    const [daily, placements, audience, ads, sets, campaigns, creatives, monthly, business] = await Promise.all([
+    const previousDates = { account_id:eq, and:"(date.gte."+period.previous.start+",date.lte."+period.previous.end+")" };
+    const [daily, placements, audience, ads, sets, campaigns, creatives, monthly, business, previousDaily] = await Promise.all([
       readAll("ad_metrics_daily", { ...dates, order:"date.asc,ad_id.asc",
         select:baseMetrics+",date,landing_page_views,add_to_cart,checkouts,video_plays,video_25,video_50,video_75,video_95,video_100" }),
       readAll("ad_delivery_metrics_daily", { ...dates, order:"date.asc,ad_id.asc,publisher_platform.asc,platform_position.asc",
@@ -75,12 +77,20 @@ Deno.serve(async (req: Request) => {
       readAll("ads", { account_id:eq, order:"id.asc", select:"id,name,campaign_id,ad_set_id,creative_id,effective_status" }),
       readAll("ad_sets", { account_id:eq, order:"id.asc", select:"id,name,audience_type,targeting,effective_status" }),
       readAll("campaigns", { account_id:eq, order:"id.asc", select:"id,name,effective_status" }),
-      readAll("creatives", { account_id:eq, order:"id.asc", select:"id,name,headline,primary_text,image_url,thumbnail_url,video_id" }),
-      readAll("traffic_management_monthly", { account_id:eq, order:"month_start.asc", select:"*" }),
-      readAll("traffic_business_monthly", { account_id:eq, order:"month_start.asc,shop_domain.asc", select:"*" }),
+      readAll("creatives", { account_id:eq, order:"id.asc", select:"id,name,headline,primary_text,image_url,thumbnail_url,video_id,configuration" }),
+      readAll("traffic_management_monthly", { account_id:eq, order:"month_start.asc", select:"month_start,meta_through_date,meta_reach,frequency,meta_spend,meta_purchases" }),
+      readAll("traffic_business_monthly", { account_id:eq, shop_domain:"eq."+shopDomain, order:"month_start.asc",
+        select:"month_start,currency,shopify_through_date,shopify_synced_at,shopify_revenue,shopify_orders,sessions,sessions_with_cart,sessions_reached_checkout,sessions_converted,conversion_rate" }),
+      period.previous.available ? readAll("ad_metrics_daily", { ...previousDates, order:"date.asc,ad_id.asc",
+        select:baseMetrics+",landing_page_views,add_to_cart,checkouts" }) : Promise.resolve([]),
     ]);
 
-    return respond(buildReport({ daily, placements, audience, ads, sets, campaigns, creatives, monthly, business }, period));
+    const latest = (values: (string | null)[]) => values.filter(Boolean).sort().at(-1) ?? null;
+    const sourceDates = {
+      meta:{ through:period.last, syncedAt:latest(runs.filter(row=>row.stream==="ads").map(row=>row.finished_at)) },
+      shopify:{ through:latest(business.map(row=>row.shopify_through_date)), syncedAt:latest(business.map(row=>row.shopify_synced_at)) },
+    };
+    return respond(buildReport({ daily, placements, audience, ads, sets, campaigns, creatives, monthly, business, previousDaily, sourceDates }, period));
   } catch (error) {
     if (error instanceof RangeError) return respond({ error: error.message }, 400);
     console.error(error instanceof Error ? error.message : "skin_report_failed");

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { Badge, PageHeader, SectionHeader, Surface } from '../components/UI.jsx'
-import { cleanCreativeName, delta, integer, money, num, pct } from '../lib/format.js'
+import { cleanCreativeName, equalMonthlyWindows, delta, integer, money, num, pct } from '../lib/format.js'
 import { classifyFunnelContext, stageLabel, summarizeContexts } from '../lib/funnelContext.js'
 
 const n=v=>Number(v||0)
@@ -52,9 +52,10 @@ function DecisionCard({title,item,toneName}){
 
 export default function ManagerDeep({data,onRefresh}){
   const deep=data?.deep||{}, business=arr(data?.shopify?.business), funnelMonths=arr(data?.funnel?.months)
-  const current=business.at(-1)||{}, previous=business.length>1?business.at(-2):{}
+  const current=business.at(-1)||{}, candidate=business.at(-2)
+  const previous=equalMonthlyWindows(current,candidate,'meta_through_date')?candidate:{}
   const funnel=funnelMonths.find(x=>x.month_start===current.month_start)||funnelMonths.at(-1)||{}
-  const prevFunnel=funnelMonths.find(x=>x.month_start===previous.month_start)||funnelMonths.at(-2)||{}
+  const prevFunnel=funnelMonths.find(x=>x.month_start===previous.month_start)||{}
   const profiles=arr(deep?.creative_profiles)
   const sets=arr(data?.bootstrap?.main?.cur?.sets||data?.bootstrap?.main?.audienceRows)
   const strategy=readLocal(STRATEGY_KEY)
@@ -63,7 +64,7 @@ export default function ManagerDeep({data,onRefresh}){
 
   const revenue=n(current.shopify_revenue), orders=n(current.shopify_orders), spend=n(current.meta_spend), sessions=n(current.sessions)
   const commercial=Boolean(current.has_shopify)
-  const cac=orders?spend/orders:0, mer=n(current.mer), conversion=n(current.conversion_rate)*100, ticket=orders?revenue/orders:0
+  const cac=n(current.cac), mer=n(current.mer), conversion=n(current.conversion_rate)*100, ticket=orders?revenue/orders:0
   const maxCac=n(strategy.max_cac), minMer=n(strategy.min_mer), budget=n(strategy.media_budget), revenueTarget=n(strategy.revenue_target)
 
   const creativeContexts=useMemo(()=>profiles.flatMap(profile=>{
