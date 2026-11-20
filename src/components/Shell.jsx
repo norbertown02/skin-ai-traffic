@@ -3,17 +3,21 @@ import React, { useState } from 'react'
 import { sourceDate } from '../lib/format.js'
 
 const primary = [
-  ['actions','O que fazer agora','01'],
-  ['creatives','Criativos','02'],
-  ['audiences','Públicos','03'],
-  ['campaigns','Campanhas','04'],
+  ['cockpit','Visão geral','01'],
+  ['campaigns','Campanhas','02'],
+  ['creatives','Criativos','03'],
+  ['audiences','Públicos','04'],
+  ['funnel','Funil e Loja','05'],
+  ['economics','Rentabilidade','06'],
+  ['experiments','Testes e decisões','07'],
+  ['integrations','Qualidade dos dados','08'],
 ]
 const secondary = [
   ['manager','Diagnóstico completo','DG'],['strategy','Metas e limites','MT'],
-  ['executive','Relatório gerencial','RG'],['approvals','Aprovações','AP'],
+  ['executive','Relatório gerencial','RG'],['actions','O que fazer agora','AC'],['compare','Comparador','CM'],
   ['analysis','Análise detalhada','AN'],['placements','Posicionamentos','PL'],
   ['sets','Conjuntos','CJ'],['ads','Anúncios','AD'],
-  ['waste','Desperdícios','DP'],['integrations','Integrações','IN']
+  ['waste','Verba sob análise','DP']
 ]
 
 export default function Shell({tab,onTab,data,onLogout,children}) {
