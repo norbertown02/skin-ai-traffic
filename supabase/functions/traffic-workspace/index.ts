@@ -64,12 +64,13 @@ Deno.serve(async request => {
  if(!user) return reply({error:'unauthorized'},401);
  try {
    if(request.method==='GET') {
-     const [settings,products,items]=await Promise.all([
+     const [settings,products,items,tags]=await Promise.all([
        database('traffic_workspace_settings',{account_id:'eq.'+account,select:'settings,updated_at'}),
        database('traffic_product_economics',{account_id:'eq.'+account,select:'id,sku,product_name,selling_price,product_cost,packaging_cost,shipping_subsidy,tax_pct,payment_pct,refund_pct,updated_at',order:'product_name.asc'}),
-       database('traffic_work_items',{account_id:'eq.'+account,select:'id,kind,title,hypothesis,entity_type,entity_id,primary_metric,baseline_start,baseline_end,test_start,test_end,status,outcome,notes,created_at,updated_at',order:'created_at.desc',limit:'200'})
+       database('traffic_work_items',{account_id:'eq.'+account,select:'id,kind,title,hypothesis,entity_type,entity_id,primary_metric,baseline_start,baseline_end,test_start,test_end,status,outcome,notes,created_at,updated_at',order:'created_at.desc',limit:'200'}),
+       database('traffic_creative_tags',{account_id:'eq.'+account,select:'creative_id,concept,role,updated_at'})
      ]);
-     return reply({settings:settings[0]?.settings??{},settings_updated_at:settings[0]?.updated_at??null,products,items});
+     return reply({settings:settings[0]?.settings??{},settings_updated_at:settings[0]?.updated_at??null,products,items,tags});
    }
    const body=await request.json();
    if(!body || typeof body!=='object') return reply({error:'Payload inválido'},400);
@@ -111,6 +112,22 @@ Deno.serve(async request => {
      const id=str(body.id,50);
      if(!/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(id)) throw new Error('Identificador inválido');
      await database('traffic_work_items',{id:'eq.'+id,account_id:'eq.'+account},'DELETE');
+     return reply({ok:true});
+   }
+   if(body.action==='save_creative_tag') {
+     const creative_id=str(body.creative_id,100);
+     const concept=str(body.concept,40),role=str(body.role,40);
+     if(!creative_id || !['pain','benefit','demonstration','social_proof','offer','product','education','comparison','lifestyle'].includes(concept)
+        || !['attention','education','consideration','conversion'].includes(role)) throw new Error('Classificação inválida');
+     await database('traffic_creative_tags',{on_conflict:'account_id,creative_id'},'POST',{
+       account_id:account,creative_id,concept,role,updated_by:user,updated_at:new Date().toISOString()
+     });
+     return reply({ok:true});
+   }
+   if(body.action==='delete_creative_tag') {
+     const creative_id=str(body.creative_id,100);
+     if(!creative_id) throw new Error('Criativo obrigatório');
+     await database('traffic_creative_tags',{account_id:'eq.'+account,creative_id:'eq.'+creative_id},'DELETE');
      return reply({ok:true});
    }
    return reply({error:'Ação desconhecida'},400);
