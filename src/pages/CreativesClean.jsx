@@ -87,7 +87,7 @@ function diagnose(item, benchmark){
   return {title:'Ainda em aprendizado',text:'A peça não acumulou amostra suficiente. O contexto de campanha/conjunto deve orientar a leitura do resultado.'}
 }
 
-export default function CreativesClean({ data }) {
+export default function CreativesClean({ data, workspace, onWorkspaceAction }) {
   const profiles=data?.deep?.creative_profiles||[]
   const benchmark=n(data?.deep?.benchmarks?.avg_ctr)
   const [filter,setFilter]=useState('all')
@@ -102,8 +102,19 @@ export default function CreativesClean({ data }) {
   const [videoError,setVideoError]=useState('')
   const [messageMap,setMessageMap]=useState(loadMessageMap)
   const [draft,setDraft]=useState(null)
+  const [tagError,setTagError]=useState('')
+  const [tagSaving,setTagSaving]=useState(false)
 
   useEffect(()=>saveMessageMap(messageMap),[messageMap])
+  useEffect(()=>{
+    const tags=workspace?.tags??[]
+    if(!tags.length)return
+    setMessageMap(previous=>{
+      const merged={...previous}
+      for(const tag of tags)merged[tag.creative_id]={role:tag.role,concept:tag.concept,updated_at:tag.updated_at}
+      return JSON.stringify(merged)===JSON.stringify(previous)?previous:merged
+    })
+  },[workspace?.tags])
   useEffect(()=>{
     if(!selected) return
     const bodyOverflow=document.body.style.overflow, htmlOverflow=document.documentElement.style.overflow
@@ -132,14 +143,22 @@ export default function CreativesClean({ data }) {
     setVideoError(result.is_video ? 'A Meta ainda não retornou retenção para este criativo.' : 'Este criativo não é vídeo.')
   }
 
-  function saveCreativeMessage(){
+  async function saveCreativeMessage(){
     if(!selectedLive||!draft)return
-    setMessageMap(prev=>({...prev,[selectedLive.id]:{role:draft.role,concept:draft.concept,updated_at:new Date().toISOString()}}))
+    setTagSaving(true);setTagError('')
+    try{
+      await onWorkspaceAction('save_creative_tag',{creative_id:String(selectedLive.id),role:draft.role,concept:draft.concept})
+      setMessageMap(prev=>({...prev,[selectedLive.id]:{role:draft.role,concept:draft.concept,updated_at:new Date().toISOString()}}))
+    }catch(error){setTagError(error.message||'Não foi possível salvar a classificação')}finally{setTagSaving(false)}
   }
-  function resetCreativeMessage(){
+  async function resetCreativeMessage(){
     if(!selectedLive)return
-    setMessageMap(prev=>{const next={...prev};delete next[selectedLive.id];return next})
-    setDraft(inferMessage(selectedLive))
+    setTagSaving(true);setTagError('')
+    try{
+      await onWorkspaceAction('delete_creative_tag',{creative_id:String(selectedLive.id)})
+      setMessageMap(prev=>{const next={...prev};delete next[selectedLive.id];return next})
+      setDraft(inferMessage(selectedLive))
+    }catch(error){setTagError(error.message||'Não foi possível restaurar')}finally{setTagSaving(false)}
   }
 
   const totalSpend=enriched.reduce((a,x)=>a+n(x.metrics?.spend),0)
@@ -220,7 +239,7 @@ export default function CreativesClean({ data }) {
       <div className="creative-detail-content">
         {detailTab==='overview'&&<><div className="creative-metric-mosaic"><Metric label="Impressões" value={integer(selectedImpressions)}/><Metric label="Cliques" value={integer(selectedClicks)}/><Metric label="CTR" value={pct(selectedCtr)} helper={`benchmark ${pct(benchmark)}`}/><Metric label="CPC" value={money(selectedCpc)}/><Metric label="CPM" value={money(selectedCpm)}/><Metric label="Receita atribuída" value={money(selectedRevenue)}/><Metric label="ROAS" value={num(selectedRoas)}/><Metric label="CAC" value={money(selectedCac)}/></div><div className="creative-detail-grid-two"><Surface eyebrow="FUNIL DA PEÇA" title="Da impressão até a compra"><div className="creative-funnel-mini"><div><span>Impressões</span><strong>{integer(selectedImpressions)}</strong><em>100%</em></div><div><span>Cliques</span><strong>{integer(selectedClicks)}</strong><em>{pct(rate(selectedClicks,selectedImpressions))}</em></div><div><span>Compras</span><strong>{integer(selectedPurchases)}</strong><em>{pct(rate(selectedPurchases,selectedClicks))}</em></div></div></Surface><Surface eyebrow="CONTEXTO" title="Onde essa peça está sendo usada"><div className="creative-read-list"><p><span>01</span><strong>Topo</strong><em>{integer(context.count.top)} contexto(s) · {money(context.spend.top)}</em></p><p><span>02</span><strong>Meio</strong><em>{integer(context.count.middle)} contexto(s) · {money(context.spend.middle)}</em></p><p><span>03</span><strong>Fundo</strong><em>{integer(context.count.bottom)} contexto(s) · {money(context.spend.bottom)}</em></p></div></Surface></div></>}
 
-        {detailTab==='strategy'&&<div className="creative-strategy-editor"><Surface eyebrow="CRIATIVO" title="Classificação da mensagem"><p className="muted-copy">Aqui classificamos somente o que a peça comunica. O estágio do funil não é editado no criativo.</p><div className="creative-strategy-form"><StrategySelect label="Função da mensagem" value={draft?.role||'attention'} onChange={v=>setDraft(d=>({...d,role:v}))} options={roles}/><StrategySelect label="Conceito" value={draft?.concept||'product'} onChange={v=>setDraft(d=>({...d,concept:v}))} options={concepts}/></div><div className="strategy-editor-actions"><button className="btn primary" onClick={saveCreativeMessage}>Salvar classificação</button><button className="btn" onClick={resetCreativeMessage}>Usar sugestão automática</button></div></Surface><Surface eyebrow="MÍDIA" title="Contexto de funil detectado"><div className="creative-observed-read"><div><span>Contexto dominante</span><strong>{stageLabel(context.dominant)}</strong></div><div><span>Conjuntos mapeados</span><strong>{integer(context.total)}</strong></div><p>Topo {integer(context.count.top)} · Meio {integer(context.count.middle)} · Fundo {integer(context.count.bottom)} · Clientes {integer(context.count.customer)} · Misto {integer(context.count.mixed)}</p><small>Essa classificação vem do nome/tipo de audiência e do contexto disponível do conjunto. Quando o targeting não está exposto pela API, marcamos como “Não classificado” em vez de inventar precisão.</small></div></Surface></div>}
+        {detailTab==='strategy'&&<div className="creative-strategy-editor"><Surface eyebrow="CRIATIVO" title="Classificação da mensagem"><p className="muted-copy">Aqui classificamos somente o que a peça comunica. O estágio do funil não é editado no criativo.</p><div className="creative-strategy-form"><StrategySelect label="Função da mensagem" value={draft?.role||'attention'} onChange={v=>setDraft(d=>({...d,role:v}))} options={roles}/><StrategySelect label="Conceito" value={draft?.concept||'product'} onChange={v=>setDraft(d=>({...d,concept:v}))} options={concepts}/></div><div className="strategy-editor-actions"><button className="btn primary" disabled={tagSaving} onClick={saveCreativeMessage}>{tagSaving?'Salvando…':'Salvar classificação'}</button><button className="btn" disabled={tagSaving} onClick={resetCreativeMessage}>Usar sugestão automática</button>{tagError&&<p role="alert" className="ps-warning">{tagError}</p>}</div></Surface><Surface eyebrow="MÍDIA" title="Contexto de funil detectado"><div className="creative-observed-read"><div><span>Contexto dominante</span><strong>{stageLabel(context.dominant)}</strong></div><div><span>Conjuntos mapeados</span><strong>{integer(context.total)}</strong></div><p>Topo {integer(context.count.top)} · Meio {integer(context.count.middle)} · Fundo {integer(context.count.bottom)} · Clientes {integer(context.count.customer)} · Misto {integer(context.count.mixed)}</p><small>Essa classificação vem do nome/tipo de audiência e do contexto disponível do conjunto. Quando o targeting não está exposto pela API, marcamos como “Não classificado” em vez de inventar precisão.</small></div></Surface></div>}
 
         {detailTab==='video'&&<Surface eyebrow="VÍDEO" title="Retenção e consumo"><div>{video?<><div className="mini-metric-grid four"><MiniMetric label="Plays" value={integer(video.plays)}/><MiniMetric label="Play rate" value={pct(video.play_rate_pct)}/></div><div className="creative-retention-wrap"><RetentionChart retention={video.retention_pct} height={300}/></div></>:<div className="creative-empty-state"><strong>Retenção indisponível</strong><p>{videoError||'A Meta não retornou dados de retenção para essa peça.'}</p></div>}</div></Surface>}
 
