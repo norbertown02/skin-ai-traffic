@@ -151,10 +151,26 @@ export function buildReport(source, period) {
   }
   const audiencesByCreative = indexContexts(creativeAudience)
   const placementsByCreative = indexContexts(creativePlacement)
-  const creativeProfiles = group(withContext, (r) => r.creative_id && ({ key:r.creative_id })).flatMap(({ key, ...values }) => {
-    const row = creative.get(key)
-    return row ? [{ ...row, metrics:values, audiences:audiencesByCreative.get(key) ?? [], placements:placementsByCreative.get(key) ?? [] }] : []
-  })
+  // Include every catalog creative, including pieces with no delivery in the selected period.
+  // Campaign status is a CURRENT snapshot, whereas metrics are historical.
+  const creativeMetricMap = new Map(group(withContext, (r) => r.creative_id && ({ key:r.creative_id })).map(({key,...values})=>[String(key),values]))
+  const creativeAds = new Map()
+  for (const adRow of source.ads) {
+    if (!adRow.creative_id) continue
+    const key=String(adRow.creative_id)
+    if(!creativeAds.has(key)) creativeAds.set(key,[])
+    creativeAds.get(key).push({id:adRow.id,name:adRow.name,status:adRow.effective_status,
+      campaign_id:adRow.campaign_id,ad_set_id:adRow.ad_set_id})
+  }
+  const creativeProfiles = source.creatives.map(row=>{
+    const linkedAds=creativeAds.get(String(row.id))||[]
+    const values=creativeMetricMap.get(String(row.id))||metrics({})
+    const active=linkedAds.some(ad=>ad.status==='ACTIVE')
+    const delivered=n(values.impressions)>0||n(values.spend)>0
+    return {...row, metrics:values, ads:linkedAds, ad_count:linkedAds.length,
+      active, delivered, current_status:active?'ACTIVE':linkedAds.length?'INACTIVE':'UNLINKED',
+      audiences:audiencesByCreative.get(row.id)??[], placements:placementsByCreative.get(row.id)??[]}
+  }).sort((a,b)=>n(b.metrics?.spend)-n(a.metrics?.spend))
   const byType = group(withContext, (r) => ({ key:r.type, name:r.type }))
   const ag = source.audience.filter((r) => r.breakdown === 'age_gender')
   const genders = { female:'Feminino', male:'Masculino', unknown:'Não informado' }
