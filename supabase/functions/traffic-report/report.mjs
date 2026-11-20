@@ -177,6 +177,25 @@ export function buildReport(source, period) {
   const genderLabel = (r) => genders[r.gender] ?? r.gender ?? 'Não informado'
   const ageLabel = (r) => r.age || 'Não informada'
   const total = sum(withContext)
+  // Observed exposure, not an estimate of financial loss. Never automatically recommend pausing.
+  const ctrReference = n(total.link_ctr || total.ctr)
+  const wasteItems = ads.filter(item=>n(item.spend)>=60 && n(item.purchases)===0)
+    .map(item=>{
+      const attention=ctrReference>0 && n(item.link_ctr || item.ctr)<ctrReference*.7
+      return {
+        id:item.id, type:attention?'Atenção':'Pós-clique',
+        creative_name:item.creative_name, ad_name:item.name, estimated_waste:n(item.spend),
+        reason:attention?'CTR de link abaixo de 70% da média do período, sem compras atribuídas.':'Investimento sem compras atribuídas; verificar página, oferta e rastreamento.',
+        action:attention?'Revisar gancho, visual e público antes de alterar a verba.':'Verificar LPV, oferta, checkout e atribuição; não pausar apenas por este sinal.',
+        category:attention?'attention':'post_click'
+      }
+    }).sort((a,b)=>b.estimated_waste-a.estimated_waste)
+  const waste = {available:true,items:wasteItems,summary:{
+    estimated_total:wasteItems.reduce((sum,item)=>sum+item.estimated_waste,0),
+    counts:{attention:wasteItems.filter(x=>x.category==='attention').length,
+      post_click:wasteItems.filter(x=>x.category==='post_click').length,
+      audience_mismatch:0,placement_mismatch:0}
+  }}
   const funnel = source.monthly.map((row) => ({
     month_start:row.month_start, through_date:row.meta_through_date,
     reach:row.meta_reach, frequency:row.frequency,
@@ -216,7 +235,7 @@ export function buildReport(source, period) {
       creative_profiles:creativeProfiles, benchmarks:{avg_ctr:total.ctr},
       cross:{creative_audience:creativeAudience,creative_placement_set:creativePlacement},
       placements:group(source.placements, (r) => ({key:r.publisher_platform+' · '+r.platform_position})),
-      waste:{available:false},
+      waste,
     },
     manager:{ decisions:[], quality:[
       { name:'Cobertura diária do Meta Ads',status:'ok',message:period.start+' a '+period.end },
