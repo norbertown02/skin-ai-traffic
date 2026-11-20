@@ -21,6 +21,10 @@ export default function IntegrationsClean({ data, workspace }) {
   const importedProducts=workspace?.productMix??[]
   const importedSegments=workspace?.customerMix??[]
   const importedAt=importedProducts.map(row=>row.synced_at).filter(Boolean).sort().at(-1)
+  const shopifySync=workspace?.shopifySync
+  const detailed=workspace?.orderDetail??[]
+  const ordersSeen=detailed.reduce((sum,row)=>sum+Number(row.orders_seen||0),0)
+  const latestOrderImport=detailed.map(row=>row.imported_at).filter(Boolean).sort().at(-1)
   return <div className="page pro-page integrations-page">
     <PageHeader eyebrow="INTEGRAÇÕES" title="Saúde das fontes de dados" description="Cobertura, atualização e diagnóstico do histórico armazenado." />
     <div className="pro-integration-grid">
@@ -36,8 +40,16 @@ export default function IntegrationsClean({ data, workspace }) {
     <Surface eyebrow="CAMADAS COMERCIAIS" title="Cobertura dos agregados Shopify">
       <p>Produtos vendidos: {integer(importedProducts.length)} registros mensais · novos e recorrentes: {integer(importedSegments.length)} registros mensais.</p>
       <p>Última importação desses recortes: {instant(importedAt)}. Essa data é independente da sincronização de Meta Ads.</p>
-      <p>O app ainda não possui pedidos individuais, SKU de cada pedido e identificação de clientes para conciliação completa. Os agregados por produto não devem ser somados como pedidos únicos.</p>
-      <p>Sincronização automática por API da Shopify: pendente de autorização e credencial segura da loja; não há rotina automática para esses recortes neste momento.</p>
+      <p>Pedidos individuais importados: {integer(ordersSeen)} · última importação {instant(latestOrderImport)}. As informações pessoais não são enviadas para o navegador; somente dados agregados são apresentados.</p>
+      <p>Itens de pedidos por SKU: {integer((workspace?.skuDetail??[]).length)} agrupamentos mensais. O sistema distingue pedidos detalhados do relatório mensal ShopifyQL, pois as receitas podem ter critérios diferentes.</p>
+      <div className="ps-checks"><div><Badge tone={shopifySync?.enabled?'success':'warning'}>{shopifySync?.enabled?'Ativada':'Aguardando credenciais'}</Badge><strong>Atualização automática de pedidos</strong><p>Agendamento previsto: a cada 30 minutos, nos minutos 15 e 45. A rotina permanece desativada até a instalação/autorização do aplicativo Shopify.</p></div></div>
+      <p>Última sincronização automática concluída: {instant(shopifySync?.last_success_at)}. Última tentativa: {instant(shopifySync?.last_started_at)}. {shopifySync?.last_error_code?'Diagnóstico: '+shopifySync.last_error_code:''}</p>
+      {!shopifySync?.enabled&&<div className="ps-warning">
+        <strong>Etapa necessária para ativar</strong>
+        <p>Crie/instale um aplicativo Shopify autorizado para esta loja no <a href="https://dev.shopify.com/dashboard" target="_blank" rel="noreferrer">Dev Dashboard</a>, com permissão de leitura de pedidos. Para todo o histórico além de 60 dias, é necessária a permissão adicional de pedidos antigos, conforme disponibilidade da Shopify.</p>
+        <p>Configure SHOPIFY_CLIENT_ID e SHOPIFY_CLIENT_SECRET como secrets no projeto Supabase <a href="https://supabase.com/dashboard/project/knosvoutxkfkawwygmyt/settings/functions" target="_blank" rel="noreferrer">Skin Beauty</a>. Não compartilhe essas credenciais pelo chat ou no GitHub. Após essa configuração, ativaremos a rotina automática com um teste da conexão.</p>
+      </div>}
+      <p className="ps-help">A atualização automática preparada é a de pedidos e itens. Sessões, métricas mensais e os recortes agregados ShopifyQL ainda exigem uma rotina separada; seus horários de importação são apresentados independentemente.</p>
     </Surface>
     {sources && <Surface eyebrow="VALIDAÇÃO" title="Meta Ads e Shopify">
       <p>O Meta atribui conversões à mídia. A Shopify contabiliza pedidos e vendas totais da loja. A diferença é diagnóstica e só aparece quando as datas coincidem.</p>

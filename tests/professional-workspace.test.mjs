@@ -19,7 +19,7 @@ test('Workspace v2 validates origin, user scope and write boundaries', async () 
    traffic.push(u)
    if(u.pathname==='/auth/v1/user') return Response.json({id:'u-1',app_metadata:{skin_report_account_id:authorized?account:'other-account'}})
    if(u.pathname.startsWith('/rest/v1/')){
-     if(u.pathname.includes('traffic_shopify_customer_mix')||u.pathname.includes('traffic_shopify_product_mix')){
+     if(/\/(traffic_shopify_(?:customer|product)_mix|shopify_(?:sync_config|order_monthly_detail|order_sku_monthly_detail|order_utm_daily|customer_cohorts_observed))$/.test(u.pathname)){
        assert.equal(u.searchParams.get('shop_domain'),'eq.9a70ec-cf.myshopify.com')
      }else if(opts.method!=='POST')assert.equal(u.searchParams.get('account_id'),'eq.'+account)
      if(opts.method==='POST'||opts.method==='PATCH'||opts.method==='DELETE'){
@@ -48,6 +48,8 @@ test('Workspace v2 validates origin, user scope and write boundaries', async () 
    assert.equal(payload.settings.revenue_target,9000)
    assert.deepEqual(payload.products,[])
    assert.deepEqual(payload.tags,[])
+   assert.deepEqual(payload.orderDetail,[])
+   assert.deepEqual(payload.skuDetail,[])
    assert.ok(traffic.some(u=>u.pathname.endsWith('/traffic_entity_change_events')))
    const write=await handler(new Request(url,{method:'POST',headers:{Origin:origin,Authorization:'Bearer fixture', 'Content-Type':'application/json'},
        body:JSON.stringify({action:'save_settings',settings:{revenue_target:8000,account_id:'malicious',admin_key:'secret',testing_pct:10}})}))

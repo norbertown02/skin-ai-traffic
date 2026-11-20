@@ -64,16 +64,21 @@ Deno.serve(async request => {
  if(!user) return reply({error:'unauthorized'},401);
  try {
    if(request.method==='GET') {
-     const [settings,products,items,tags,events,customerMix,productMix]=await Promise.all([
+     const [settings,products,items,tags,events,customerMix,productMix,shopifySync,orderDetail,skuDetail,orderUtm,cohorts]=await Promise.all([
        database('traffic_workspace_settings',{account_id:'eq.'+account,select:'settings,updated_at'}),
        database('traffic_product_economics',{account_id:'eq.'+account,select:'id,sku,product_name,selling_price,product_cost,packaging_cost,shipping_subsidy,tax_pct,payment_pct,refund_pct,updated_at',order:'product_name.asc'}),
        database('traffic_work_items',{account_id:'eq.'+account,select:'id,kind,title,hypothesis,entity_type,entity_id,primary_metric,baseline_start,baseline_end,test_start,test_end,status,outcome,notes,created_at,updated_at',order:'created_at.desc',limit:'200'}),
        database('traffic_creative_tags',{account_id:'eq.'+account,select:'creative_id,concept,role,updated_at'}),
        database('traffic_entity_change_events',{account_id:'eq.'+account,select:'entity_type,entity_id,entity_name,captured_on,change_types',order:'captured_on.desc',limit:'100'}),
        database('traffic_shopify_customer_mix',{shop_domain:'eq.9a70ec-cf.myshopify.com',select:'month_start,segment,orders,total_sales,synced_at,through_date',order:'month_start.asc',limit:'200'}),
-       database('traffic_shopify_product_mix',{shop_domain:'eq.9a70ec-cf.myshopify.com',select:'month_start,product_name,orders,total_sales,net_items_sold,synced_at,through_date',order:'month_start.asc',limit:'500'})
+       database('traffic_shopify_product_mix',{shop_domain:'eq.9a70ec-cf.myshopify.com',select:'month_start,product_name,orders,total_sales,net_items_sold,synced_at,through_date',order:'month_start.asc',limit:'500'}),
+       database('shopify_sync_config',{shop_domain:'eq.9a70ec-cf.myshopify.com',select:'shop_domain,enabled,last_started_at,last_success_at,last_error_at,last_error_code,last_processed_count,backfill_from'}),
+       database('shopify_order_monthly_detail',{shop_domain:'eq.9a70ec-cf.myshopify.com',select:'month_start,orders_seen,valid_orders,cancelled_orders,current_order_total,known_customers,first_orders,repeat_orders,tagged_orders,journey_checked,incomplete_line_items,imported_at',order:'month_start.asc',limit:'36'}),
+       database('shopify_order_sku_monthly_detail',{shop_domain:'eq.9a70ec-cf.myshopify.com',select:'month_start,sku,product_name,orders_including_item,units,item_sales,imported_at',order:'month_start.asc',limit:'600'}),
+       database('shopify_order_utm_daily',{shop_domain:'eq.9a70ec-cf.myshopify.com',select:'day,utm_source,utm_medium,utm_campaign,orders,revenue,first_orders,repeat_orders,tagged_orders,attribution_checked',order:'day.desc',limit:'500'}),
+       database('shopify_customer_cohorts_observed',{shop_domain:'eq.9a70ec-cf.myshopify.com',select:'cohort,customers_seen,observed_repeat_customers,orders_seen,revenue_seen,revenue_per_observed_customer',order:'cohort.asc',limit:'36'})
      ]);
-     return reply({settings:settings[0]?.settings??{},settings_updated_at:settings[0]?.updated_at??null,products,items,tags,events,customerMix,productMix});
+     return reply({settings:settings[0]?.settings??{},settings_updated_at:settings[0]?.updated_at??null,products,items,tags,events,customerMix,productMix,shopifySync:shopifySync[0]??null,orderDetail,skuDetail,orderUtm,cohorts});
    }
    const body=await request.json();
    if(!body || typeof body!=='object') return reply({error:'Payload inválido'},400);
