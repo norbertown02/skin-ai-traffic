@@ -50,7 +50,7 @@ export default function App() {
     if (periodMode === '90') return { days: 90 }
     if (periodMode === '180') return { days: 180 }
     let since, until
-    if (periodMode === 'month') { since = `${periodYear}-${periodMonth}-01`; until = new Date(Number(periodYear),Number(periodMonth),0).toLocaleDateString('en-CA') }
+    if (periodMode === 'month') { since = `${periodYear}-${periodMonth}-01`; until = `${periodYear}-${periodMonth}-${String(new Date(Number(periodYear),Number(periodMonth),0).getDate()).padStart(2,'0')}` }
     else if (periodMode === 'year') { since = `${periodYear}-01-01`; until = `${periodYear}-12-31` }
     else { since = periodStart; until = periodEnd }
     if (!validDay(since) || !validDay(until) || since > until) return null
