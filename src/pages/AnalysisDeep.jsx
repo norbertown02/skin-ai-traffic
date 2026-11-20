@@ -9,38 +9,11 @@ const sort=(rows,key='spend')=>(rows||[]).slice().sort((a,b)=>n(b[key])-n(a[key]
 function Metric({label,value,note}){return <div className="deep-metric"><span>{label}</span><strong>{value}</strong>{note&&<small>{note}</small>}</div>}
 
 export default function AnalysisDeep({data}){
-  const [range,setRange]=useState('30')
-  const [year,setYear]=useState(String(new Date().getFullYear()))
-  const [customStart,setCustomStart]=useState('')
-  const [customEnd,setCustomEnd]=useState('')
-  const [analysis,setAnalysis]=useState(null)
-  const [loading,setLoading]=useState(false)
-  const [rangeError,setRangeError]=useState('')
-  const today=new Date().toISOString().slice(0,10)
-  const currentYear=new Date().getFullYear()
-  const selectedYear=Number(year)
-  const startDate=range==='year' ? `${year}-01-01` : range==='custom' ? customStart : ''
-  const endDate=range==='year' ? (selectedYear===currentYear?today:`${year}-12-31`) : range==='custom'?customEnd : today
-  const calendarDays=startDate&&endDate ? Math.round((Date.parse(endDate+'T12:00:00Z')-Date.parse(startDate+'T12:00:00Z'))/86400000)+1 : 0
-  const days=range==='year'||range==='custom'?calendarDays:Number(range)
-  const invalidRange=!!(range==='custom'&&(!customStart||!customEnd||customStart>customEnd||customEnd>today)) || (range==='year'&&selectedYear>currentYear)
-  useEffect(()=>{
-    if(range==='30'){setAnalysis(null);setRangeError('');setLoading(false);return}
-    if(invalidRange||days<1){setAnalysis(null);setRangeError('Selecione um intervalo de datas válido.');setLoading(false);return}
-    const controller = new AbortController()
-    const params = startDate ? { days, since: startDate, until: endDate } : { days }
-    setLoading(true);setRangeError('')
-    loadCoreData(params, controller.signal)
-      .then(result=>{if(!controller.signal.aborted)setAnalysis(result)})
-      .catch(error=>{if(!controller.signal.aborted)setRangeError(error.message||'Não foi possível consultar o período selecionado.')})
-      .finally(()=>{if(!controller.signal.aborted)setLoading(false)})
-    return ()=>controller.abort()
-  },[range,year,customStart,customEnd])
-  const source=analysis||data||{}
+  const source=data||{}
   const deep=source.deep||{}, perf=source.bootstrap?.performance||{}, audience=source.audience||{}
   const crossAudience=deep?.cross?.creative_audience||[], crossPlacement=deep?.cross?.creative_placement_set||[], waste=deep?.waste||{}, daily=perf?.daily||[], labels=daily.map(x=>String(x.date||'').slice(5))
   const [tab,setTab]=useState('overview')
-  const period=range==='30' ? perf?.periods?.current30||{} : perf?.periods?.current||perf?.periods?.selected||perf?.periods?.current30||{}
+  const period=perf?.periods?.current||perf?.periods?.current30||{}
   const rangeInfo=source.bootstrap?.main?.period
   const intervalLabel=rangeInfo ? `${rangeInfo.start.split('-').reverse().join('/')} a ${rangeInfo.end.split('-').reverse().join('/')}` : ''
   const topAudience=sort(crossAudience,'spend').slice(0,12), topPlacement=sort(crossPlacement,'spend').slice(0,12)
@@ -51,19 +24,7 @@ export default function AnalysisDeep({data}){
 
   return <div className="page deep-page analysis-deep">
     <PageHeader eyebrow="ANÁLISE DETALHADA" title="Central de investigação" description="Aprofunda o que o relatório executivo apontou: leilão, atenção, qualidade do clique, público, placement, criativo e fundo de funil."/>
-    <div className="analysis-period-filter" style={{display:'flex',gap:12,alignItems:'end',flexWrap:'wrap',padding:'14px 0'}}>
-      <label>Período <select value={range} onChange={e=>setRange(e.target.value)}>
-        <option value="7">Últimos 7 dias</option><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option>
-        <option value="180">Últimos 6 meses</option><option value="year">Ano inteiro</option><option value="custom">Personalizado</option>
-      </select></label>
-      {range==='year'&&<label>Ano <select value={year} onChange={e=>setYear(e.target.value)}>{Array.from({length:5},(_,i)=>currentYear-i).map(y=><option key={y} value={y}>{y}</option>)}</select></label>}
-      {range==='custom'&&<><label>Início <input type="date" value={customStart} max={today} onChange={e=>setCustomStart(e.target.value)}/></label><label>Fim <input type="date" value={customEnd} max={today} onChange={e=>setCustomEnd(e.target.value)}/></label></>}
-      <small>{intervalLabel}</small>
-    </div>
-    {rangeInfo?.coverage?.placements===false&&<p role="status">A base tem cobertura parcial de posicionamentos neste intervalo.</p>}
-    {loading&&<p role="status">Consultando dados do período selecionado…</p>}
-    {rangeError&&<p role="alert" style={{color:'#9d3a43',fontWeight:600}}>{rangeError}</p>}
-    {!loading&&rangeError&&<p>Os indicadores abaixo continuam exibindo o último período válido; não representam o intervalo solicitado.</p>}
+    {source?.bootstrap?.main?.period?.coverage?.placements===false&&<p role="status">A base tem cobertura parcial de posicionamentos neste período.</p>}
     <div className="tabs deep-tabs">{tabs.map(([k,l])=><button key={k} className={tab===k?'active':''} onClick={()=>setTab(k)}>{l}</button>)}</div>
 
     {tab==='overview'&&<>
