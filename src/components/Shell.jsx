@@ -8,6 +8,7 @@ const primary = [
   ['creatives','Criativos','03'],
   ['audiences','Públicos','04'],
   ['funnel','Funil e Loja','05'],
+  ['commerce','Produtos e recorrência','CM'],
   ['economics','Rentabilidade','06'],
   ['experiments','Testes e decisões','07'],
   ['integrations','Qualidade dos dados','08'],
