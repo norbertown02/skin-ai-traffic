@@ -64,14 +64,16 @@ Deno.serve(async request => {
  if(!user) return reply({error:'unauthorized'},401);
  try {
    if(request.method==='GET') {
-     const [settings,products,items,tags,events]=await Promise.all([
+     const [settings,products,items,tags,events,customerMix,productMix]=await Promise.all([
        database('traffic_workspace_settings',{account_id:'eq.'+account,select:'settings,updated_at'}),
        database('traffic_product_economics',{account_id:'eq.'+account,select:'id,sku,product_name,selling_price,product_cost,packaging_cost,shipping_subsidy,tax_pct,payment_pct,refund_pct,updated_at',order:'product_name.asc'}),
        database('traffic_work_items',{account_id:'eq.'+account,select:'id,kind,title,hypothesis,entity_type,entity_id,primary_metric,baseline_start,baseline_end,test_start,test_end,status,outcome,notes,created_at,updated_at',order:'created_at.desc',limit:'200'}),
        database('traffic_creative_tags',{account_id:'eq.'+account,select:'creative_id,concept,role,updated_at'}),
-       database('traffic_entity_change_events',{account_id:'eq.'+account,select:'entity_type,entity_id,entity_name,captured_on,change_types',order:'captured_on.desc',limit:'100'})
+       database('traffic_entity_change_events',{account_id:'eq.'+account,select:'entity_type,entity_id,entity_name,captured_on,change_types',order:'captured_on.desc',limit:'100'}),
+       database('traffic_shopify_customer_mix',{shop_domain:'eq.9a70ec-cf.myshopify.com',select:'month_start,segment,orders,total_sales,synced_at,through_date',order:'month_start.asc',limit:'200'}),
+       database('traffic_shopify_product_mix',{shop_domain:'eq.9a70ec-cf.myshopify.com',select:'month_start,product_name,orders,total_sales,net_items_sold,synced_at,through_date',order:'month_start.asc',limit:'500'})
      ]);
-     return reply({settings:settings[0]?.settings??{},settings_updated_at:settings[0]?.updated_at??null,products,items,tags,events});
+     return reply({settings:settings[0]?.settings??{},settings_updated_at:settings[0]?.updated_at??null,products,items,tags,events,customerMix,productMix});
    }
    const body=await request.json();
    if(!body || typeof body!=='object') return reply({error:'Payload inválido'},400);
