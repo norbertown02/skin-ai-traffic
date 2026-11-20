@@ -52,6 +52,27 @@ function creativeState(profile, benchmark) {
   return { label: 'Em teste', tone: 'neutral', key: 'testing' }
 }
 
+function CreativeMedia({item,large=false}){
+ const [broken,setBroken]=useState(false)
+ const url=item.image_url||item.thumbnail_url
+ useEffect(()=>setBroken(false),[url])
+ const likelyTiny=!item.image_url && !!item.thumbnail_url && /(?:p64x64|\/p64|_p64|64x64)/i.test(item.thumbnail_url)
+ return <div className={'skin-media-frame '+(large?'is-large':'')}>
+  {url&&!broken?<img src={url} alt={'Prévia: '+displayCreativeName(item)} loading={large?'eager':'lazy'} onError={()=>setBroken(true)} />:<div className="skin-no-preview"><strong>Prévia indisponível</strong><small>O Meta não forneceu uma imagem acessível.</small></div>}
+  {likelyTiny&&!broken&&<span className="skin-preview-note">Miniatura reduzida do Meta</span>}
+  {item.video_id&&<span className="skin-video-indicator">▶ Vídeo</span>}
+ </div>
+}
+function displayCreativeName(item){
+ let raw=String(item?.name||item?.ads?.[0]?.name||'Criativo sem nome').trim()
+ raw=raw.replace(/\s+20\d{2}-\d{2}-\d{2}-[a-f0-9]{20,}\s*$/i,'')
+   .replace(/(?:^|\s)[a-f0-9]{24,}\s*$/i,'')
+   .replace(/\s+(?:20\d{2}-\d{2}-\d{2})\s*$/,'')
+   .replace(/\s{2,}/g,' ').trim()
+ if(/^\{\{[^}]+\}\}$/.test(raw)) return item?.ads?.[0]?.name||'Anúncio dinâmico de catálogo'
+ return cleanCreativeName(raw||item?.ads?.[0]?.name,'Criativo')
+}
+
 function Metric({label,value,helper}){return <div className="creative-detail-metric"><span>{label}</span><strong>{value}</strong>{helper&&<small>{helper}</small>}</div>}
 function StrategySelect({label,value,onChange,options}){return <label className="creative-strategy-field"><span>{label}</span><select value={value} onChange={e=>onChange(e.target.value)}>{options.map(([k,l])=><option key={k} value={k}>{l}</option>)}</select></label>}
 
@@ -69,6 +90,10 @@ export default function CreativesClean({ data }) {
   const benchmark=n(data?.deep?.benchmarks?.avg_ctr)
   const [filter,setFilter]=useState('all')
   const [roleFilter,setRoleFilter]=useState('all')
+  const [statusFilter,setStatusFilter]=useState('delivered')
+  const [mediaFilter,setMediaFilter]=useState('all')
+  const [query,setQuery]=useState('')
+  const [sortBy,setSortBy]=useState('spend')
   const [selected,setSelected]=useState(null)
   const [detailTab,setDetailTab]=useState('overview')
   const [video,setVideo]=useState(null)
@@ -91,7 +116,11 @@ export default function CreativesClean({ data }) {
     return {...p,state:creativeState(p,benchmark),message,contextSummary}
   }),[profiles,benchmark,messageMap])
 
-  const visible=enriched.filter(x=>(filter==='all'||x.state.key===filter)&&(roleFilter==='all'||x.message.role===roleFilter))
+  const visible=enriched.filter(x=>(filter==='all'||x.state.key===filter)&&(roleFilter==='all'||x.message.role===roleFilter)
+   &&(statusFilter==='all'||(statusFilter==='active'?x.active:statusFilter==='inactive'?!x.active:statusFilter==='delivered'?x.delivered:!x.delivered))
+   &&(mediaFilter==='all'||(mediaFilter==='video'?Boolean(x.video_id):mediaFilter==='image'?!x.video_id&&Boolean(x.image_url||x.thumbnail_url):!x.image_url&&!x.thumbnail_url))
+   &&(!query||[displayCreativeName(x),x.name,x.headline,x.primary_text,...(x.ads||[]).map(a=>a.name)].join(' ').toLowerCase().includes(query.toLowerCase())))
+   .sort((a,b)=>sortBy==='roas'?n(b.metrics?.roas)-n(a.metrics?.roas):sortBy==='purchases'?n(b.metrics?.purchases)-n(a.metrics?.purchases):sortBy==='name'?displayCreativeName(a).localeCompare(displayCreativeName(b),'pt-BR'):n(b.metrics?.spend)-n(a.metrics?.spend))
   const selectedLive=selected?enriched.find(x=>String(x.id)===String(selected.id))||selected:null
 
   function openCreative(item){
@@ -113,8 +142,8 @@ export default function CreativesClean({ data }) {
 
   const totalSpend=enriched.reduce((a,x)=>a+n(x.metrics?.spend),0)
   const totalPurchases=enriched.reduce((a,x)=>a+n(x.metrics?.purchases),0)
-  const winners=enriched.filter(x=>x.state.key==='winner').length
-  const review=enriched.filter(x=>['attention','postclick'].includes(x.state.key)).length
+  const winners=enriched.filter(x=>x.delivered&&x.state.key==='winner').length
+  const review=enriched.filter(x=>x.delivered&&['attention','postclick'].includes(x.state.key)).length
   const roleCoverage=roles.map(([key,label])=>({key,label,count:enriched.filter(x=>x.message.role===key).length,spend:enriched.filter(x=>x.message.role===key).reduce((a,x)=>a+n(x.metrics?.spend),0)}))
 
   const selectedMetrics=selectedLive?.metrics||{}
@@ -136,7 +165,7 @@ export default function CreativesClean({ data }) {
     <PageHeader eyebrow="CRIATIVOS" title="Inteligência criativa" description="O criativo descreve a mensagem. Topo, Meio e Fundo agora vêm do contexto de campanha, conjunto e audiência — e a mesma peça pode aparecer em mais de um estágio." />
 
     <div className="pro-stat-grid four">
-      <div className="pro-stat"><div><span>Criativos com entrega</span></div><strong>{integer(enriched.length)}</strong><small>{money(totalSpend)} investidos</small></div>
+      <div className="pro-stat"><div><span>Criativos no catálogo</span></div><strong>{integer(enriched.length)}</strong><small>{integer(enriched.filter(x=>x.delivered).length)} com entrega no período · {money(totalSpend)}</small></div>
       <div className="pro-stat"><div><span>Vencedores</span></div><strong>{integer(winners)}</strong><small>Compra + eficiência</small></div>
       <div className="pro-stat"><div><span>Precisam revisão</span></div><strong>{integer(review)}</strong><small>Atenção ou pós-clique</small></div>
       <div className="pro-stat"><div><span>Compras atribuídas</span></div><strong>{integer(totalPurchases)}</strong><small>CTR benchmark {pct(benchmark)}</small></div>
@@ -147,18 +176,29 @@ export default function CreativesClean({ data }) {
       <div className="coverage-grid four">{roleCoverage.map(x=><button key={x.key} className={roleFilter===x.key?'active':''} onClick={()=>setRoleFilter(roleFilter===x.key?'all':x.key)}><span>{x.label}</span><strong>{integer(x.count)}</strong><small>{money(x.spend)} investidos</small></button>)}</div>
     </section>
 
+    <div className="skin-creative-toolbar" aria-label="Filtros de criativos">
+       <label>Status atual <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}>
+        <option value="delivered">Com entrega no período</option><option value="active">Somente ativos agora</option><option value="inactive">Pausados ou inativos</option><option value="idle">Sem entrega no período</option><option value="all">Todos os criativos cadastrados</option>
+       </select></label>
+       <label>Formato <select value={mediaFilter} onChange={e=>setMediaFilter(e.target.value)}><option value="all">Todos</option><option value="video">Vídeo</option><option value="image">Imagem</option><option value="missing">Sem prévia</option></select></label>
+       <label>Ordenar <select value={sortBy} onChange={e=>setSortBy(e.target.value)}><option value="spend">Maior investimento</option><option value="purchases">Mais compras</option><option value="roas">Melhor ROAS</option><option value="name">Nome A–Z</option></select></label>
+       <label className="skin-creative-search">Buscar criativo <input type="search" placeholder="Nome, anúncio ou texto" value={query} onChange={e=>setQuery(e.target.value)} /></label>
+       <span className="skin-results-count">{integer(visible.length)} de {integer(enriched.length)} criativos</span>
+    </div>
+    <p className="skin-status-help">Status ativo/pausado é a situação atual no Meta; métricas e entrega seguem o período selecionado no filtro global. Criativos sem entrega permanecem disponíveis em “Todos”.</p>
     <div className="tabs pro-tabs">{[['all','Todos'],['winner','Vencedores'],['promising','Promissores'],['attention','Atenção'],['postclick','Pós-clique'],['testing','Em teste']].map(([key,label])=><button key={key} className={filter===key?'active':''} onClick={()=>setFilter(key)}>{label}</button>)}</div>
 
+    {!visible.length&&<div className="skin-creative-empty">Nenhum criativo corresponde aos filtros selecionados. Experimente “Todos os criativos cadastrados”.</div>}
     <div className="pro-creative-grid">{visible.map(item=><article className="pro-creative-card" key={item.id} onClick={()=>openCreative(item)}>
-      <div className="pro-creative-media">{item.image_url||item.thumbnail_url?<img src={item.image_url||item.thumbnail_url} alt="" loading="lazy"/>:<div>SKIN</div>}<Badge tone={item.state.tone}>{item.state.label}</Badge></div>
-      <div className="pro-creative-body"><div className="creative-strategy-tags"><span>{labelOf(roles,item.message.role)}</span><span>{labelOf(concepts,item.message.concept)}</span><span>Usado em {stageLabel(item.contextSummary.dominant)}</span></div><h3>{cleanCreativeName(item.name,'Criativo')}</h3><p>{item.headline||item.primary_text||item.hook||'Sem headline estruturada.'}</p><div><span><small>Gasto</small><strong>{money(item.metrics?.spend)}</strong></span><span><small>ROAS</small><strong>{num(item.metrics?.roas)}</strong></span><span><small>CTR</small><strong>{pct(item.metrics?.ctr)}</strong></span><span><small>Compras</small><strong>{integer(item.metrics?.purchases)}</strong></span></div></div>
+      <div className="pro-creative-media"><CreativeMedia item={item}/><Badge tone={item.state.tone}>{item.state.label}</Badge></div>
+      <div className="pro-creative-body"><div className="creative-strategy-tags"><span>{labelOf(roles,item.message.role)}</span><span>{labelOf(concepts,item.message.concept)}</span><span>{item.active?'Ativo agora':'Inativo agora'}</span><span>{item.delivered?'Com entrega':'Sem entrega'}</span><span>Funil: {stageLabel(item.contextSummary.dominant)}</span></div><h3>{displayCreativeName(item)}</h3><p>{item.headline||item.primary_text||item.hook||'Sem headline estruturada.'}</p><div><span><small>Gasto</small><strong>{money(item.metrics?.spend)}</strong></span><span><small>ROAS</small><strong>{num(item.metrics?.roas)}</strong></span><span><small>CTR</small><strong>{pct(item.metrics?.ctr)}</strong></span><span><small>Compras</small><strong>{integer(item.metrics?.purchases)}</strong></span></div></div>
     </article>)}</div>
 
     {selectedLive&&<div className="creative-detail-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setSelected(null)}><section className="creative-detail-shell">
-      <header className="creative-detail-topbar"><div><span>ANÁLISE DO CRIATIVO</span><strong>{cleanCreativeName(selectedLive.name,'Criativo')}</strong></div><button onClick={()=>setSelected(null)}>Fechar ×</button></header>
+      <header className="creative-detail-topbar"><div><span>ANÁLISE DO CRIATIVO</span><strong>{displayCreativeName(selectedLive)}</strong></div><button onClick={()=>setSelected(null)}>Fechar ×</button></header>
       <div className="creative-detail-hero">
-        <div className="creative-detail-media">{selectedLive.image_url||selectedLive.thumbnail_url?<img src={selectedLive.image_url||selectedLive.thumbnail_url} alt=""/>:<div className="creative-detail-placeholder">SKIN</div>}</div>
-        <div className="creative-detail-summary"><div className="creative-detail-status"><Badge tone={selectedLive.state.tone}>{selectedLive.state.label}</Badge><span>{text(selectedLive.format||selectedLive.media_type||selectedLive.type,'Peça de mídia')}</span></div><h2>{selectedLive.headline||cleanCreativeName(selectedLive.name,'Criativo')}</h2><p>{selectedLive.primary_text||selectedLive.hook||'Sem texto principal estruturado para esta peça.'}</p>
+        <div className="creative-detail-media"><CreativeMedia item={selectedLive} large/></div>
+        <div className="creative-detail-summary"><div className="creative-detail-status"><Badge tone={selectedLive.state.tone}>{selectedLive.state.label}</Badge><span>{selectedLive.video_id?'Vídeo':'Imagem ou catálogo'}</span><span>{selectedLive.active?'Ativo agora':'Não ativo agora'}</span></div><h2>{displayCreativeName(selectedLive)}</h2><p>{selectedLive.primary_text||selectedLive.hook||'Sem texto principal estruturado para esta peça.'}</p>
           <div className="creative-role-summary"><div><span>FUNÇÃO DA MENSAGEM</span><strong>{labelOf(roles,selectedLive.message.role)}</strong><small>{labelOf(concepts,selectedLive.message.concept)}</small></div><div><span>CONTEXTO DOMINANTE</span><strong>{stageLabel(context.dominant)}</strong><small>Definido pelos conjuntos/audiências onde a peça roda</small></div></div>
           <div className="creative-detail-diagnosis"><span>LEITURA</span><strong>{diagnosis.title}</strong><p>{diagnosis.text}</p></div>
           <div className="creative-detail-scoreline"><Metric label="Gasto" value={money(selectedMetrics.spend)}/><Metric label="Compras" value={integer(selectedPurchases)}/><Metric label="ROAS" value={num(selectedRoas)}/><Metric label="CAC" value={money(selectedCac)}/></div>
