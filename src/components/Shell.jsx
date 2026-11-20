@@ -17,7 +17,7 @@ const secondary = [
   ['executive','Relatório gerencial','RG'],['actions','O que fazer agora','AC'],['compare','Comparador','CM'],
   ['analysis','Análise detalhada','AN'],['placements','Posicionamentos','PL'],
   ['sets','Conjuntos','CJ'],['ads','Anúncios','AD'],
-  ['waste','Verba sob análise','DP']
+  ['waste','Verba sob análise','DP'],['history','Histórico de mudanças','HM']
 ]
 
 export default function Shell({tab,onTab,data,onLogout,children}) {
