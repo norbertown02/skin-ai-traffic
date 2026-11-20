@@ -206,8 +206,15 @@ export function buildReport(source, period) {
     }),
   }))
   const shopify = new Map(source.business.filter((row) => row.shop_domain).map((row) => [row.month_start,row]))
+  // Shopify numbers arrive at month granularity. Do not attribute full-month
+  // orders/revenue to an arbitrary date interval within that month.
+  const fullMonthSelection = period.start.slice(8)==='01' &&
+    (period.end === period.last || addDays(period.end,1).slice(8)==='01')
   const business = source.monthly.map((row) => {
-    const commercial = shopify.get(row.month_start)
+    const rawShopify = shopify.get(row.month_start)
+    const commercial = fullMonthSelection && rawShopify &&
+      rawShopify.shopify_through_date <= period.end &&
+      rawShopify.shopify_through_date >= period.start ? rawShopify : null
     return {
       ...commercial, month_start:row.month_start, meta_spend:row.meta_spend, meta_roas:row.meta_roas,
       meta_through_date:row.meta_through_date, meta_purchases:row.meta_purchases, meta_revenue:row.meta_revenue,
@@ -222,7 +229,7 @@ export function buildReport(source, period) {
       main:{ period, cur:{ k:total, ads, sets, campaigns }, daily, audienceRows:sets, audienceSummary:{ by_type:byType } },
       performance:{ daily, periods:{ current:total, current30:total } },
     },
-    shopify:{ business, available:shopify.size > 0 },
+    shopify:{ business, available:business.some(row=>row.has_shopify), monthly_only:true, period_compatible:fullMonthSelection },
     funnel:{ months:funnel },
     audience:{
       total,
