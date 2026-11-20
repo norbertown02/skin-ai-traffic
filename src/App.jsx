@@ -16,9 +16,10 @@ import WasteDeep from './pages/WasteDeep.jsx'
 import { clearSession, loadCoreData, subscribeSession, workspaceRequest } from './api.js'
 import { Cockpit, FunnelLab, CompareMedia } from './pages/ProfessionalSuite.jsx'
 import ChangeHistory from './pages/ChangeHistory.jsx'
+import CommerceIntelligence from './pages/CommerceIntelligence.jsx'
 import { EconomicsStudio, ExperimentCenter } from './pages/ProfessionalWork.jsx'
 
-const validTabs = new Set(['history','cockpit','funnel','compare','economics','experiments','actions','strategy','manager','executive','approvals','analysis','creatives','audiences','placements','campaigns','sets','ads','waste','integrations'])
+const validTabs = new Set(['commerce','history','cockpit','funnel','compare','economics','experiments','actions','strategy','manager','executive','approvals','analysis','creatives','audiences','placements','campaigns','sets','ads','waste','integrations'])
 const hashTab = () => {
   const key = String(window.location.hash || '').replace(/^#\/?/, '')
   return validTabs.has(key) ? key : 'cockpit'
@@ -154,6 +155,7 @@ export default function App() {
   }
 
   const page = {
+    commerce: <CommerceIntelligence data={data} workspace={workspace} onNavigate={navigate}/>,
     history: <ChangeHistory data={data} workspace={workspace} onNavigate={navigate}/>,
     cockpit: <Cockpit data={data} workspace={workspace} onNavigate={navigate}/>,
     funnel: <FunnelLab data={data}/>,
