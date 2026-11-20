@@ -50,7 +50,7 @@ function DecisionCard({title,item,toneName}){
   </article>
 }
 
-export default function ManagerDeep({data,onRefresh}){
+export default function ManagerDeep({data,onRefresh,workspace}){
   const deep=data?.deep||{}, business=arr(data?.shopify?.business), funnelMonths=arr(data?.funnel?.months)
   const current=business.at(-1)||{}, candidate=business.at(-2)
   const previous=equalMonthlyWindows(current,candidate,'meta_through_date')?candidate:{}
@@ -58,7 +58,7 @@ export default function ManagerDeep({data,onRefresh}){
   const prevFunnel=funnelMonths.find(x=>x.month_start===previous.month_start)||{}
   const profiles=arr(deep?.creative_profiles)
   const sets=arr(data?.bootstrap?.main?.cur?.sets||data?.bootstrap?.main?.audienceRows)
-  const strategy=readLocal(STRATEGY_KEY)
+  const strategy=workspace?.settings && Object.keys(workspace.settings).length ? workspace.settings : readLocal(STRATEGY_KEY)
   const messageMap=readLocal(MESSAGE_KEY)
   const [selectedContext,setSelectedContext]=useState('auto')
 
@@ -135,7 +135,7 @@ export default function ManagerDeep({data,onRefresh}){
   const topCreativeContexts=relevantContexts.slice().sort((a,b)=>n(b.spend)-n(a.spend)).slice(0,6)
   const conceptMix=Object.values(relevantContexts.reduce((acc,row)=>{const k=row._concept||'product';if(!acc[k])acc[k]={key:k,count:0,spend:0,purchases:0};acc[k].count++;acc[k].spend+=n(row.spend);acc[k].purchases+=n(row.purchases);return acc},{})).sort((a,b)=>b.spend-a.spend)
 
-  const winners=profiles.filter(x=>n(x?.metrics?.purchases)>=2&&n(x?.metrics?.roas)>=1).slice().sort((a,b)=>n(b.metrics?.spend)-n(a.metrics?.spend))
+  const winners=profiles.filter(x=>n(x?.metrics?.purchases)>=3&&n(x?.metrics?.spend)>=50&&n(x?.metrics?.roas)>=1).slice().sort((a,b)=>n(b.metrics?.spend)-n(a.metrics?.spend))
   const strategyReady=Boolean(maxCac||minMer||budget||revenueTarget)
   const primaryEntity=topSets[0]?.ad_set_name||topSets[0]?.name||topSets[0]?.set_name||stageLabel(primaryContext)
   const primaryCreative=topCreativeContexts[0]?`${topCreativeContexts[0]._creativeName} · ${conceptLabels[topCreativeContexts[0]._concept]||'Produto'}`:'criativos do estágio'
