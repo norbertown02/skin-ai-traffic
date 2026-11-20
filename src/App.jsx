@@ -27,7 +27,7 @@ export default function App() {
   const [session, setSession] = useState(undefined)
   const [tab, setTab] = useState(hashTab)
   const [data, setData] = useState(null)
-  const [workspace, setWorkspace] = useState({settings:{},products:[],items:[]})
+  const [workspace, setWorkspace] = useState({settings:{},products:[],items:[],tags:[]})
   const [workspaceError, setWorkspaceError] = useState('')
   const [periodMode, setPeriodMode] = useState('month')
   const [periodMonth, setPeriodMonth] = useState(String(new Date().getMonth()+1).padStart(2,'0'))
@@ -41,7 +41,7 @@ export default function App() {
   async function expireSession(message) {
     request.current?.abort()
     setLoading(false)
-    setSession(null); setData(null); setWorkspace({settings:{},products:[],items:[]}); setError(message || '')
+    setSession(null); setData(null); setWorkspace({settings:{},products:[],items:[],tags:[]}); setError(message || '')
     await clearSession()
   }
 
@@ -111,7 +111,7 @@ export default function App() {
       request.current?.abort()
       setLoading(false)
       setData(null)
-      setWorkspace({settings:{},products:[],items:[]})
+      setWorkspace({settings:{},products:[],items:[],tags:[]})
     }
   }), [])
   useEffect(() => {
@@ -163,7 +163,7 @@ export default function App() {
     manager: <ManagerDeep data={data} workspace={workspace} onRefresh={refresh} />,
     approvals: <ExperimentCenter data={data} workspace={workspace} onWorkspaceAction={onWorkspaceAction} onNavigate={navigate}/>,
     analysis: <AnalysisDeep data={data} />,
-    creatives: <CreativesClean data={data} />,
+    creatives: <CreativesClean data={data} workspace={workspace} onWorkspaceAction={onWorkspaceAction} />,
     audiences: <AudienceDeep data={data} onNavigate={navigate} />,
     placements: <PlacementDeep data={data} />,
     campaigns: <EntityDeep data={data} type="campaign" />,
