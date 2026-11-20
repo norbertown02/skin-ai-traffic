@@ -14,13 +14,14 @@ export default function IntegrationsClean({ data }) {
     <div className="pro-integration-grid">
       <Surface eyebrow="SHOPIFY" title="Verdade comercial" actions={<Badge tone={business.length ? 'success' : 'danger'}>{business.length ? 'Dados disponíveis' : 'Sem dados'}</Badge>}>
         <h3 className="pro-big-label">{latestBusiness ? monthLabel(latestBusiness.month_start) : '—'}</h3>
-        <p className="muted-copy">Pedidos, receita, sessões, carrinho e checkout consolidados. Esta é a fonte comercial usada no Relatório Gerencial e no Gestor IA.</p>
+        <p className="muted-copy">Pedidos, receita, sessões, carrinho e checkout consolidados por mês a partir do Shopify. Última importação: {latestBusiness?.shopify_synced_at ? new Date(latestBusiness.shopify_synced_at).toLocaleString('pt-BR') : 'não disponível'}. Importação histórica confirmada; atualização automática da Shopify ainda não configurada.</p>
       </Surface>
       <Surface eyebrow="META ADS" title="Entrega e atribuição" actions={<Badge tone={metaDate ? 'warning' : 'danger'}>{metaDate ? 'Histórico disponível' : 'Sem histórico'}</Badge>}>
         <h3 className="pro-big-label">{metaDate ? metaDate.split('-').reverse().join('/') : '—'}</h3>
         <p className="muted-copy">Última data encontrada no histórico de mídia. A existência desse histórico não significa que a API ao vivo esteja operacional neste momento.</p>
       </Surface>
     </div>
+    {data?.shopify?.period_compatible===false&&<div className="form-error">A Shopify disponibiliza totais mensais nesta base. Para não misturar meses completos com um intervalo parcial, a comparação de vendas ficou indisponível neste filtro. Selecione um mês inteiro ou um ano completo.</div>}
     <Surface eyebrow="QUALIDADE" title="Validações do motor">
       {quality.length ? <div className="signal-list">{quality.slice(0,10).map((x,i)=><div className="signal-row" key={x.id || i}><span>{i+1}</span><div><strong>{x.name || x.check_name || x.title || 'Verificação'}</strong><p>{x.message || x.detail || x.description || String(x.status || 'Verificação registrada')}</p></div></div>)}</div> : <p className="muted-copy">Nenhuma validação estruturada de qualidade foi retornada pelo motor contínuo.</p>}
       {critical.length > 0 && <div className="form-error">Há {critical.length} verificação(ões) crítica(s). Evite decisões agressivas até a origem ser validada.</div>}
